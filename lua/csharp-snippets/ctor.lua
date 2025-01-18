@@ -2,6 +2,8 @@ local ls = require("luasnip")
 local s = ls.snippet
 local i = ls.insert_node
 local f = ls.function_node
+local c = ls.choice_node
+local t = ls.text_node
 local fmta = require("luasnip.extras.fmt").fmta
 
 local context = require("csharp-snippets.context")
@@ -58,13 +60,20 @@ return {
         },
         fmta(
             [[
-    public <name>()
+    <modifiers><name>()
     {
         <body>
     }
 
     ]],
             {
+                modifiers = c(1, {
+                    t("public "),
+                    t("private "),
+                    t("protected "),
+                    t("internal "),
+                    t(""),
+                }),
                 name = f(context.get_class_name, {}),
                 body = i(0),
             }
@@ -82,13 +91,20 @@ return {
         },
         fmta(
             [[
-    public <name>(<parameters>)
+    <modifiers><name>(<parameters>)
     {
         <body>
     }
 
     ]],
             {
+                modifiers = c(1, {
+                    t("public "),
+                    t("private "),
+                    t("protected "),
+                    t("internal "),
+                    t(""),
+                }),
                 name = f(context.get_class_name, {}),
                 parameters = f(build_constructor_parameters, {}),
                 body = f(build_constructor_body, {}),
