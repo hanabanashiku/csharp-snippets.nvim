@@ -1,5 +1,8 @@
 {
     "diagonstics.globals": [
         "vim"
+    ],
+    "diagnostics.globals": [
+        "get_csproj"
     ]
 }
