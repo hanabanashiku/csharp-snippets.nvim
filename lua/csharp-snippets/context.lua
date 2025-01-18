@@ -38,14 +38,24 @@ local function get_class_fields()
     return fields
 end
 
--- local function get_class_fields()
---     local class = get_enclosing_class()
---     if class == nil then return nil end
+local function has_type_defined(name)
+    local node = ts_utils.get_node_at_cursor()
 
---     for _, child in ipairs(class:children()) do
---         if child:type()
---     end
--- end
+    if node == nil then
+        return false
+    end
+
+    local root = ts_utils.get_root_for_node(node)
+
+    for declaration in root:iter_children() do
+        vim.print(declaration:type())
+        if vim.treesitter.get_node_text(declaration:field("name")[1], 0) == name then
+            return true
+        end
+    end
+
+    return false
+end
 
 local function is_in_class() return get_class_name() ~= nil end
 
@@ -53,5 +63,5 @@ return {
     get_class_name = get_class_name,
     is_in_class = is_in_class,
     get_class_fields = get_class_fields,
-    get_enclosing_class = get_enclosing_class,
+    has_type_defined = has_type_defined,
 }
