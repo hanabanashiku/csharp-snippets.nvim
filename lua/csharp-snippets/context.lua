@@ -55,6 +55,10 @@ end
 
 local function is_in_class() return get_class_name() ~= nil end
 
+local function is_in_block()
+    return ts_utils.get_node_at_cursor():type() == "block"
+end
+
 local function get_sln()
     local current_path = vim.fn.expand("%:p:h")
     while current_path ~= "/" do
@@ -173,6 +177,7 @@ end
 return {
     get_class_name = get_class_name,
     is_in_class = is_in_class,
+    is_in_block = is_in_block,
     get_class_fields = get_class_fields,
     has_type_defined = has_type_defined,
     get_sln = get_sln,
