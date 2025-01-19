@@ -34,7 +34,6 @@ end
 
 local function can_create_type()
     local node = ts_utils.get_node_at_cursor()
-
     return node == nil or node:type() == "declaration_list"
 end
 

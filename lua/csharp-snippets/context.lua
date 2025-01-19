@@ -46,7 +46,6 @@ local function has_type_defined(name)
     local root = ts_utils.get_root_for_node(node)
 
     for declaration in root:iter_children() do
-        vim.print(declaration:type())
         if vim.treesitter.get_node_text(declaration:field("name")[1], 0) == name then return true end
     end
 
