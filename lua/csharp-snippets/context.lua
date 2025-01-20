@@ -40,13 +40,12 @@ end
 
 local function has_type_defined(name)
     local node = ts_utils.get_node_at_cursor()
-
     if node == nil then return false end
-
     local root = ts_utils.get_root_for_node(node)
 
     for declaration in root:iter_children() do
-        if vim.treesitter.get_node_text(declaration:field("name")[1], 0) == name then return true end
+        local name_field = declaration:field("name")[1]
+        if name_field ~= nil and vim.treesitter.get_node_text(name_field, 0) == name then return true end
     end
 
     return false
@@ -83,7 +82,7 @@ local get_editorconfig = function()
     local file = nil
     while current_path ~= "/" do
         local editorconfig_files = vim.fn.globpath(current_path, ".editorconfig", false, true)
-        if #editorconfig_files > 0 then 
+        if #editorconfig_files > 0 then
             file = editorconfig_files[1]
             break
         end
@@ -155,9 +154,13 @@ local function get_project_info()
 
         local packages = {}
 
-        for _, project in ipairs(result["projects"]) do
-            for _, package in ipairs(project["frameworks"][1]["topLevelPackages"]) do
-                table.insert(packages, package["id"])
+        for _, proj in ipairs(result["projects"]) do
+            for _, package in ipairs(proj["frameworks"][1]["topLevelPackages"]) do
+                -- vim.print(package)
+                table.insert(packages, {
+                    name = package.id,
+                    version = tonumber(package.resolvedVersion:match("^%d+"))
+                })
             end
         end
 

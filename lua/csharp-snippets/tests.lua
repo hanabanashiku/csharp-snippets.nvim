@@ -2,6 +2,8 @@ local ls = require("luasnip")
 local s = ls.snippet
 local sn = ls.snippet_node
 local i = ls.insert_node
+local t = ls.text_node
+local c = ls.choice_node
 local d = ls.dynamic_node
 local fmta = require("luasnip.extras.fmt").fmta
 
@@ -20,22 +22,38 @@ local function get_test_library()
     local packages = proj.list_packages()
 
     for _, package in ipairs(packages) do
-        if package == "NUnit" or package == "XUnit" or package == "MSTest" then
-            test_library = package
-            return package
+        local name = package.name
+        if name == "NUnit" then
+            if package.version < 3 then
+                test_library = "NUnit.Framework.Legacy"
+            else
+                test_library = "NUnit"
+            end
+            break
+        end
+
+        if name == "XUnit" or name == "MSTest" then
+            test_library = name
+            break
         end
     end
-    return nil
+    return test_library
 end
 
 
 local function can_create_fixture()
+    local type
     local node = ts_utils.get_node_at_cursor()
-    return node == nil or node:type() == "declaration_list"
+    if node ~= nil then type = node:type() else type = nil end
+    return type == nil or type =="declaration_list" or type == "compilation_unit"
 end
 
 local function is_nunit()
     return get_test_library() == "NUnit"
+end
+
+local function is_nunit_legacy()
+    return get_test_library() == "NUnit.Framework.Legacy"
 end
 
 local function is_xunit()
@@ -53,9 +71,38 @@ local function get_default_fixture_name()
     return sn(nil, i(1, name))
 end
 
-local nunit_fixture = s(
+local aaa = s(
     {
-        trig = "fixture",
+        trig = "aaa",
+        wordTrig = true,
+        name = "Arrange Act Assert"
+    },
+    {
+        t({"// Arrange", ""}),
+        i(1),
+        t({"", "// Act", ""}),
+        i(2),
+        t({"", "// Assert"}),
+        i(3)
+    },
+    {
+        show_condition = function()
+            return get_test_library() ~= nil and context.is_in_block()
+        end
+    }
+)
+
+local fixture = "fixture"
+local setup = "setup"
+local teardown = "teardown"
+local onetime = "ot"
+local test = "test"
+
+local nunit = {}
+
+table.insert(nunit, s(
+    {
+        trig = fixture,
         wordTrig = true,
         name = "NUnit test fixture"
     },
@@ -72,14 +119,14 @@ local nunit_fixture = s(
     }),
     {
         show_condition = function()
-            return is_nunit and can_create_fixture
+            return (is_nunit() or is_nunit_legacy()) and can_create_fixture()
         end
     }
-)
+))
 
-local nunit_setup = s(
+table.insert(nunit, s(
     {
-        trig = "setup",
+        trig = setup,
         wordTrig = true,
         name = "NUnit SetUp"
     },
@@ -95,14 +142,14 @@ local nunit_setup = s(
     }),
     {
         show_condition = function()
-            return is_nunit() and not context.has_type_defined("SetUp")
+            return (is_nunit() or is_nunit_legacy()) and not context.has_type_defined("SetUp")
         end
     }
-)
+))
 
-local nunit_teardown = s(
+table.insert(nunit, s(
     {
-        trig = "teardown",
+        trig = teardown,
         wordTrig = true,
         name = "NUnit TearDown"
     },
@@ -118,14 +165,14 @@ local nunit_teardown = s(
     }),
     {
         show_condition = function()
-            return is_nunit() and not context.has_type_defined("TearDown")
+            return (is_nunit() or is_nunit_legacy()) and not context.has_type_defined("TearDown")
         end
     }
-)
+))
 
-local nunit_otsetup = s(
+table.insert(nunit, s(
     {
-        trig = "otsetup",
+        trig = onetime..setup,
         wordTrig = true,
         name = "NUnit OneTimeSetUp"
     },
@@ -141,14 +188,14 @@ local nunit_otsetup = s(
     }),
     {
         show_condition = function()
-            return is_nunit() and not context.has_type_defined("OneTimeSetUp")
+            return (is_nunit() or is_nunit_legacy()) and not context.has_type_defined("OneTimeSetUp")
         end
     }
-)
+))
 
-local nunit_otteardown = s(
+table.insert(nunit, s(
     {
-        trig = "otteardown",
+        trig = onetime..teardown,
         wordTrig = true,
         name = "NUnit OneTimeSetUp"
     },
@@ -164,14 +211,14 @@ local nunit_otteardown = s(
     }),
     {
         show_condition = function()
-            return is_nunit() and not context.has_type_defined("OneTimeTearDown")
+            return (is_nunit() or is_nunit_legacy()) and not context.has_type_defined("OneTimeTearDown")
         end
     }
-)
+))
 
-local nunit_test = s(
+table.insert(nunit, s(
     {
-        trig = "test",
+        trig = test,
         wordTrig = true,
         name = "NUnit test"
     },
@@ -187,14 +234,14 @@ local nunit_test = s(
     }),
     {
         show_condition = function()
-            return is_nunit and context.is_in_class()
+            return (is_nunit() or is_nunit_legacy()) and context.is_in_class()
         end
     }
-)
+))
 
-local nunit_test_async = s(
+table.insert(nunit, s(
     {
-        trig = "testa",
+        trig = test.."a",
         wordTrig = true,
         name = "NUnit async test"
     },
@@ -213,15 +260,188 @@ local nunit_test_async = s(
             return is_nunit and context.is_in_class()
         end
     }
-)
+))
 
-return {
-    nunit_fixture,
-    nunit_setup,
-    nunit_teardown,
-    nunit_otsetup,
-    nunit_otteardown,
-    nunit_test,
-    nunit_test_async
-    -- todo asserts
+local asserts = {
+    {trig = "asrtt", value = "True"},
+    {trig = "asrtf", value = "False"},
+    {trig = "asrtn", value = "Null"},
+    {trig = "asrtnn", value = "NotNull", v3 = "Not.Null" },
+    {trig = "asrtempty", value = "Empty", legacy = "IsEmpty"},
+    {trig = "asrtnempty", value = "NotEmpty", v3 = "Not.Empty", legacy = "IsNotEmpty"},
+    {trig = "asrtz", value = "Zero" },
+    {trig = "asrtnz", value = "NotZero", v3 = "Not.Zero" },
 }
+
+for _, assert in ipairs(asserts) do
+    table.insert(nunit, s(
+    {
+        trig = assert.trig,
+        wordTrig = true,
+        name = "Assert "..assert.value
+    },
+    {
+        t("Assert.That("),
+        i(0),
+        t(", Is."..(assert.v3 or assert.value)..");")
+    },
+    {
+        show_condition = function()
+            return is_nunit() and context.is_in_block()
+        end
+    }
+    ))
+
+    table.insert(nunit, s(
+    {
+        trig = assert.trig,
+        wordTrig = true,
+        name = "Assert "..assert.value
+    },
+    {
+        t("Assert."..(assert.legacy or assert.value).."("),
+        i(0),
+        t(");")
+    },
+    {
+        show_condition = function()
+            return is_nunit_legacy() and context.is_in_block()
+        end
+    }
+    ))
+end
+
+table.insert(nunit, s(
+    {
+        trig = "asrte",
+        wordTrig = true,
+        name = "Assert Equal"
+    },
+    {
+        t("Assert.That("),
+        i(1),
+        t(", Is.EqualTo("),
+        i(2),
+        t("));")
+    },
+    {
+        show_condition = function()
+            return is_nunit() and context.is_in_block()
+        end
+    }
+))
+
+table.insert(nunit, s(
+    {
+        trig = "asrte",
+        wordTrig = true,
+        name = "Assert Equal"
+    },
+    {
+        t("Assert.AreEqual("),
+        i(1),
+        t(", "),
+        i(2),
+        t(");")
+    },
+    {
+        show_condition = function()
+            return is_nunit_legacy() and context.is_in_block()
+        end
+    }
+))
+
+table.insert(nunit, s(
+    {
+        trig = "asrtne",
+        wordTrig = true,
+        name = "Assert Not Equal"
+    },
+    {
+        t("Assert.That("),
+        i(1),
+        t(", Is.Not.EqualTo("),
+        i(2),
+        t("));")
+    },
+    {
+        show_condition = function()
+            return is_nunit() and context.is_in_block()
+        end
+    }
+))
+
+table.insert(nunit, s(
+    {
+        trig = "asrtne",
+        wordTrig = true,
+        name = "Assert Not Equal"
+    },
+    {
+        t("Assert.AreNotEqual("),
+        i(1),
+        t(", "),
+        i(2),
+        t(");")
+    },
+    {
+        show_condition = function()
+            return is_nunit_legacy() and context.is_in_block()
+        end
+    }
+))
+
+table.insert(nunit, s(
+    {
+        trig = "asrt",
+        wordTrig = true,
+        name = "Assert"
+    },
+    {
+        t("Assert.That("),
+        i(1),
+        t(", "),
+        c(2, {
+            t("Is."),
+            t("Is.Not."),
+            t("Has."),
+            t("Has.No."),
+            t("Contains."),
+            t("Does."),
+            t("Does.Not."),
+            i(2)
+        }),
+        i(3),
+        t(");")
+    },
+    {
+        show_condition = function()
+            return is_nunit() and context.is_in_block()
+        end
+    }
+))
+table.insert(nunit, s(
+    {
+        trig = "asrt",
+        wordTrig = true,
+        name = "Assert"
+    },
+    {
+        t("Assert."),
+        i(1),
+        t("("),
+        i(2),
+        t(");")
+    },
+    {
+        show_condition = function()
+            return is_nunit_legacy() and context.is_in_block()
+        end
+    }
+))
+
+local snippets = {aaa}
+
+for _, snip in ipairs(nunit) do table.insert(snippets, snip) end
+
+return snippets
