@@ -42,15 +42,16 @@ end
 
 local function use_file_scoped()
     if not file_scoped_supported() then return false end
+    local node = ts_utils.get_node_at_cursor()
+    if node == nil then return true end
 
-    for child in ts_utils.get_root_for_node(ts_utils.get_node_at_cursor()):iter_children() do
+    for child in ts_utils.get_root_for_node(node):iter_children() do
         if child:type() == "file_scoped_namespace_declaration" or child:type() == "namespace_declaration" then
             return false
         end
     end
 
-    local node = ts_utils.get_node_at_cursor()
-    return node ~= nil and node:type() == "compilation_unit"
+    return node:type() == "compilation_unit"
 end
 
 local function resolve_default_namespace()
@@ -77,7 +78,7 @@ local function namespace()
         return sn(nil, {
             t("namespace "),
             i(1, default_namespace),
-            t({ ";", "" }),
+            t({ ";", "", "" }),
             i(0),
         })
     end
@@ -90,7 +91,6 @@ local function namespace()
     {
         <body>
     }
-
     ]],
             {
                 identifier = i(1, default_namespace),
@@ -100,14 +100,17 @@ local function namespace()
     )
 end
 
+Namespace_Snippet =
+s({
+    trig = "namespace",
+    wordTrig = true,
+    name = "Namespace",
+}, {
+    d(1, namespace, {}),
+}, {
+    show_condition = namespace_supported,
+})
+
 return {
-    s({
-        trig = "namespace",
-        wordTrig = true,
-        name = "Namespace",
-    }, {
-        d(1, namespace, {}),
-    }, {
-        show_condition = namespace_supported,
-    }),
+    Namespace_Snippet,
 }

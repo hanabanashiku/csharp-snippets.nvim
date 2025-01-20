@@ -185,6 +185,10 @@ local enum = s(
     }
 )
 
+Class_Snippet = class
+Enum_Snippet = enum
+Interface_Snippet = interface
+
 return {
     class,
     struct,
