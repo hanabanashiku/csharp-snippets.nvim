@@ -1,6 +1,5 @@
 local luasnip = require("luasnip")
 local s = luasnip.snippet
-local t = luasnip.text_node
 local i = luasnip.insert_node
 local fmta = require("luasnip.extras.fmt").fmta
 local ts_utils = require("nvim-treesitter.ts_utils")
@@ -9,7 +8,8 @@ local context = require("csharp-snippets.context")
 local is_in_block = context.is_in_block
 
 local function is_in_switch()
-    return ts_utils.get_node_at_cursor():type() == "switch_body"
+    local node = ts_utils.get_node_at_cursor()
+    return node ~= nil and node:type() == "switch_body"
 end
 
 local function show_switch_expression()

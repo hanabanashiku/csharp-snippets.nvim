@@ -49,11 +49,13 @@ local function can_create_fixture()
 end
 
 local function is_nunit()
-    return get_test_library() == "NUnit"
+    return true
+    -- return get_test_library() == "NUnit"
 end
 
 local function is_nunit_legacy()
-    return get_test_library() == "NUnit.Framework.Legacy"
+    return false
+    -- return get_test_library() == "NUnit.Framework.Legacy"
 end
 
 local function is_xunit()
@@ -87,7 +89,8 @@ local aaa = s(
     },
     {
         show_condition = function()
-            return get_test_library() ~= nil and context.is_in_block()
+            return context.is_in_block()
+            -- return get_test_library() ~= nil and context.is_in_block()
         end
     }
 )

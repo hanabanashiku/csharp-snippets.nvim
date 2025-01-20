@@ -34,7 +34,7 @@ end
 
 local function can_create_type()
     local node = ts_utils.get_node_at_cursor()
-    return node == nil or node:type() == "declaration_list"
+    return node == nil or node:type() == "declaration_list" or node:type() == "compilation_unit"
 end
 
 local class = s(
@@ -51,7 +51,7 @@ local class = s(
     }
     ]],
         {
-            modifiers = c(3, {
+            modifiers = c(2, {
                 t("public "),
                 t("private "),
                 t("abstract "),
@@ -59,14 +59,14 @@ local class = s(
                 t("protected "),
                 t(""),
             }),
-            static = c(4, {
+            static = c(3, {
                 t(""),
                 t("static "),
                 t("sealed "),
                 t("unsafe "),
             }),
-            identifier = d(2, get_default_name, {}),
-            body = i(1),
+            identifier = d(1, get_default_name, {}),
+            body = i(0),
         }
     ),
     {

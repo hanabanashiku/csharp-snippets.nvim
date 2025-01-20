@@ -54,7 +54,8 @@ end
 local function is_in_class() return get_class_name() ~= nil end
 
 local function is_in_block()
-    return ts_utils.get_node_at_cursor():type() == "block"
+    local node = ts_utils.get_node_at_cursor()
+    return node ~= nil and node:type() == "block"
 end
 
 local function get_sln()
