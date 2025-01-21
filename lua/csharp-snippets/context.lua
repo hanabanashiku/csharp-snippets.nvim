@@ -1,6 +1,19 @@
 local ts_utils = require("nvim-treesitter.ts_utils")
 local ts = vim.treesitter
 
+local info_cache = {}
+local function get_or_add(csproj_path, key, value_source)
+    if info_cache[csproj_path] == nil then
+        info_cache[csproj_path] = {}
+    end
+
+    if info_cache[csproj_path][key] == nil then
+        info_cache[csproj_path][key] = value_source()
+    end
+
+    return info_cache[csproj_path][key]
+end
+
 local function get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
     while node do
@@ -120,35 +133,49 @@ local function get_project_info()
     local csproj = get_csproj()
     if csproj == nil then return nil end
 
-    local file = io.open(csproj, "r")
-    if file == nil then return nil end
+    return get_or_add(csproj, "project_info", function()
+        local file = io.open(csproj, "r")
+        if file == nil then return nil end
 
-    local project = file:read("a")
-    file:close()
+        local project = file:read("a")
+        file:close()
 
-    local frameworks = project:match("<TargetFrameworks?>(.+)</TargetFrameworks?>") or ""
-    local all_frameworks = {}
-    for str in frameworks:gmatch("[^;]+") do
-        table.insert(all_frameworks, str)
-    end
+        local frameworks = project:match("<TargetFrameworks?>(.+)</TargetFrameworks?>") or ""
+        local all_frameworks = {}
+        for str in frameworks:gmatch("[^;]+") do
+            table.insert(all_frameworks, str)
+        end
 
-    local language_version = project:match("<LangVersion>(.+)</LangVersion>")
-    if language_version == nil then language_version = "latest" end
-    if language_version == "latest" or language_version == "latestMajor" or language_version == "default" or language_version == "preview" then
-        language_version = 9999
-    else
-        language_version = tonumber(language_version)
-    end
+        local language_version = project:match("<LangVersion>(.+)</LangVersion>")
+        if language_version == nil then language_version = "latest" end
+        if language_version == "latest" or language_version == "latestMajor" or language_version == "default" or language_version == "preview" then
+            language_version = 9999
+        else
+            language_version = tonumber(language_version)
+        end
 
-    local latest_core_version = nil
-    for _, framework in ipairs(all_frameworks) do
-        local version = framework:match("net(%d+%.%d)")
-        if version ~= nil then latest_core_version = math.max((latest_core_version or 0), tonumber(version)) end
-    end
+        local latest_core_version = nil
+        for _, framework in ipairs(all_frameworks) do
+            local version = framework:match("net(%d+%.%d)")
+            if version ~= nil then latest_core_version = math.max((latest_core_version or 0), tonumber(version)) end
+        end
 
-    local function list_packages()
-        -- run dotnet cli to get packages
-        local handle = io.popen("dotnet list " .. csproj .. " package --format json")
+    return {
+        target_frameworks = all_frameworks,
+        lang_version = language_version,
+        latest_core_version = latest_core_version,
+        default_namespace = project:match("<RootNamespace>(.+)</RootNamespace>") or vim.fn.fnamemodify(csproj, ":t:r"),
+    }
+    end)
+end
+
+local function list_packages()
+    -- run dotnet cli to get packages
+    local csproj_path = get_csproj()
+    if csproj_path == nil then return {} end
+
+    return get_or_add(csproj_path, "packages", function()
+        local handle = io.popen("dotnet list " .. csproj_path .. " package --format json")
         if handle == nil then return {} end
         local result = vim.json.decode(handle:read("*a"))
         handle:close()
@@ -167,15 +194,62 @@ local function get_project_info()
 
         return packages
     end
-
-    return {
-        target_frameworks = all_frameworks,
-        lang_version = language_version,
-        latest_core_version = latest_core_version,
-        list_packages = list_packages,
-        default_namespace = project:match("<RootNamespace>(.+)</RootNamespace>") or vim.fn.fnamemodify(csproj, ":t:r"),
-    }
+    )
 end
+
+local function get_test_library()
+    local csproj_path = get_csproj()
+
+    return get_or_add(csproj_path, "test_library", function()
+        local packages = list_packages()
+        local test_library = nil
+
+        for _, package in ipairs(packages) do
+            local name = package.name
+            if name == "NUnit" then
+                if package.version < 3 then
+                    test_library = "NUnit.Framework.Legacy"
+                else
+                    test_library = "NUnit"
+                end
+                break
+            end
+
+            if name == "XUnit" or name == "MSTest" then
+                test_library = name
+                break
+            end
+        end
+        return test_library
+    end)
+end
+
+-- pre-populate the cache to prevent snippet lag
+vim.api.nvim_create_autocmd("BufEnter", {
+    pattern = "*.cs",
+    callback = function()
+        local csproj = get_csproj()
+
+        if csproj == nil or info_cache[csproj] ~= nil then
+            return
+        end
+
+        get_project_info()
+        list_packages()
+
+        if csproj:match("[Tt]ests?") then
+            get_test_library()
+        end
+    end
+})
+
+vim.api.nvim_create_autocmd("FileChangedShellPost", {
+    pattern = "*.csproj",
+    callback = function(ev)
+        local csproj = ev.file
+        info_cache[csproj] = nil
+    end
+})
 
 return {
     get_class_name = get_class_name,
@@ -186,5 +260,7 @@ return {
     get_sln = get_sln,
     get_csproj = get_csproj,
     get_project_info = get_project_info,
-    get_editorconfig = get_editorconfig
+    list_packages = list_packages,
+    get_editorconfig = get_editorconfig,
+    get_test_library = get_test_library,
 }

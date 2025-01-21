@@ -10,37 +10,6 @@ local fmta = require("luasnip.extras.fmt").fmta
 local ts_utils = require("nvim-treesitter.ts_utils")
 local context = require("csharp-snippets.context")
 
-local test_library = nil
-
-local function get_test_library()
-    if test_library ~= nil then
-        return test_library
-    end
-
-    local proj = context.get_project_info()
-    if proj == nil then return false end
-    local packages = proj.list_packages()
-
-    for _, package in ipairs(packages) do
-        local name = package.name
-        if name == "NUnit" then
-            if package.version < 3 then
-                test_library = "NUnit.Framework.Legacy"
-            else
-                test_library = "NUnit"
-            end
-            break
-        end
-
-        if name == "XUnit" or name == "MSTest" then
-            test_library = name
-            break
-        end
-    end
-    return test_library
-end
-
-
 local function can_create_fixture()
     local type
     local node = ts_utils.get_node_at_cursor()
@@ -49,21 +18,19 @@ local function can_create_fixture()
 end
 
 local function is_nunit()
-    return true
-    -- return get_test_library() == "NUnit"
+    return context.get_test_library() == "NUnit"
 end
 
 local function is_nunit_legacy()
-    return false
-    -- return get_test_library() == "NUnit.Framework.Legacy"
+    return context.get_test_library() == "NUnit.Framework.Legacy"
 end
 
 local function is_xunit()
-    return get_test_library() == "XUnit"
+    return context.get_test_library() == "XUnit"
 end
 
 local function is_mstest()
-    return get_test_library() == "MSTest"
+    return context.get_test_library() == "MSTest"
 end
 
 local function get_default_fixture_name()
@@ -89,8 +56,7 @@ local aaa = s(
     },
     {
         show_condition = function()
-            return context.is_in_block()
-            -- return get_test_library() ~= nil and context.is_in_block()
+            return context.get_test_library() ~= nil and context.is_in_block()
         end
     }
 )
@@ -103,7 +69,7 @@ local test = "test"
 
 local nunit = {}
 
-table.insert(nunit, s(
+local nunit_fixture = s(
     {
         trig = fixture,
         wordTrig = true,
@@ -125,7 +91,8 @@ table.insert(nunit, s(
             return (is_nunit() or is_nunit_legacy()) and can_create_fixture()
         end
     }
-))
+)
+table.insert(nunit, nunit_fixture)
 
 table.insert(nunit, s(
     {
@@ -446,5 +413,10 @@ table.insert(nunit, s(
 local snippets = {aaa}
 
 for _, snip in ipairs(nunit) do table.insert(snippets, snip) end
+
+Test_Fixture_Snippets = {
+    NUnit = nunit_fixture,
+    ["NUnit.Framework.Legacy"] = nunit_fixture,
+}
 
 return snippets

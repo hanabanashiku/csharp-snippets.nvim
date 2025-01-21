@@ -185,13 +185,69 @@ local enum = s(
     }
 )
 
+local attribute = s(
+    {
+        trig = "attribute",
+        wordTrig = true,
+        name = "Attribute"
+    },
+    fmta([[
+    [AttributeUsage(AttributeTargets.<target>, Inherited = <inherited>, AllowMultiple = <allow_multiple>)]
+    <modifier>sealed class <identifier> : Attribute
+    {
+        <body>
+    }
+    ]], {
+        target = c(1, {
+            t("Class"),
+            t("Enum"),
+            t("Parameter"),
+            t("Property"),
+            t("Method"),
+            t("Assembly"),
+            t("Module"),
+            t("Struct"),
+            t("Constructor"),
+            t("Field"),
+            t("Event"),
+            t("Interface"),
+            t("Delegate"),
+            t("ReturnValue"),
+            t("GenericParameter"),
+            t("All"),
+        }),
+        inherited = c(2, {
+            t("false"),
+            t("true"),
+        }),
+        allow_multiple = c(3, {
+            t("false"),
+            t("true"),
+        }),
+        modifier = c(4, {
+            t("public "),
+            t("private "),
+            t("protected "),
+            t("internal "),
+            t(""),
+        }),
+        identifier = d(5, get_default_name, {}),
+        body = i(0),
+    }),
+    {
+        show_condition = can_create_type,
+    }
+)
+
 Class_Snippet = class
 Enum_Snippet = enum
 Interface_Snippet = interface
+Attribute_Snippet = attribute
 
 return {
     class,
     struct,
     interface,
     enum,
+    attribute
 }

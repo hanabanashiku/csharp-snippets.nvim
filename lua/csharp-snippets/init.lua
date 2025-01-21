@@ -6,7 +6,7 @@ local function setup()
     ls.add_snippets("cs", require("csharp-snippets.namespace"))
     ls.add_snippets("cs", require("csharp-snippets.loops"))
     ls.add_snippets("cs", require("csharp-snippets.blocks"))
-    -- ls.add_snippets("cs", require("csharp-snippets.tests"))
+    ls.add_snippets("cs", require("csharp-snippets.tests"))
 
     require("csharp-snippets.autocmd")
 end
