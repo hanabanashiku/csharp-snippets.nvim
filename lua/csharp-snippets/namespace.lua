@@ -100,8 +100,7 @@ local function namespace()
     )
 end
 
-Namespace_Snippet =
-s({
+Namespace_Snippet = s({
     trig = "namespace",
     wordTrig = true,
     name = "Namespace",

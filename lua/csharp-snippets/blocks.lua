@@ -15,9 +15,7 @@ end
 local function show_switch_expression()
     local proj = context.get_project_info()
 
-    if proj == nil then
-        return false
-    end
+    if proj == nil then return false end
 
     return is_in_block() and proj.lang_version >= 8
 end
@@ -26,19 +24,22 @@ local if_block = s(
     {
         trig = "if",
         wordTrig = true,
-        name = "if statement"
+        name = "if statement",
     },
-    fmta([[
+    fmta(
+        [[
     if (<expression>)
     {
         <body>
     }
-    ]], {
-        expression = i(1),
-        body = i(0)
-    }),
+    ]],
+        {
+            expression = i(1),
+            body = i(0),
+        }
+    ),
     {
-        show_condition = is_in_block
+        show_condition = is_in_block,
     }
 )
 
@@ -46,19 +47,22 @@ local else_if = s(
     {
         trig = "elif",
         wordTrig = true,
-        name = "else if statement"
+        name = "else if statement",
     },
-    fmta([[
+    fmta(
+        [[
     else if (<expression>)
     {
         <body>
     }
-    ]], {
-        expression = i(1),
-        body = i(0)
-    }),
+    ]],
+        {
+            expression = i(1),
+            body = i(0),
+        }
+    ),
     {
-        show_condition = is_in_block
+        show_condition = is_in_block,
     }
 )
 
@@ -66,18 +70,21 @@ local else_block = s(
     {
         trig = "else",
         wordTrig = true,
-        name = "else statement"
+        name = "else statement",
     },
-    fmta([[
+    fmta(
+        [[
     else
     {
         <body>
     }
-    ]], {
-        body = i(0)
-    }),
+    ]],
+        {
+            body = i(0),
+        }
+    ),
     {
-        show_condition = is_in_block
+        show_condition = is_in_block,
     }
 )
 
@@ -85,191 +92,209 @@ local ternary = s(
     {
         trig = "?:",
         wordTrig = true,
-        name = "Ternary expression"
+        name = "Ternary expression",
     },
-    fmta([[
+    fmta(
+        [[
     <expression> ? <a> : <b>;
-    ]], {
-        expression = i(1),
-        a = i(2),
-        b = i(3)
-    }),
+    ]],
+        {
+            expression = i(1),
+            a = i(2),
+            b = i(3),
+        }
+    ),
     {
-        show_condition = is_in_block
+        show_condition = is_in_block,
     }
 )
 
 local switch = s(
-{
-    trig = "switch",
-    wordTrig = true,
-    name = "switch statement"
-},
-fmta([[
+    {
+        trig = "switch",
+        wordTrig = true,
+        name = "switch statement",
+    },
+    fmta(
+        [[
     switch (<variable>)
     {
         <body>
     }
 ]],
-{
-    variable = i(1),
-    body = i(0)
-}),
-{
-    show_condition = is_in_block
-}
+        {
+            variable = i(1),
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 local case = s(
-{
-    trig = "case",
-    wordTrig = true,
-    name = "switch case statement"
-},
-fmta([[
+    {
+        trig = "case",
+        wordTrig = true,
+        name = "switch case statement",
+    },
+    fmta(
+        [[
     case <case>:
         <body>
         break;
 ]],
-{
-    case = i(1),
-    body = i(0)
-}),
-{
-    show_condition = is_in_switch
-}
+        {
+            case = i(1),
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_switch,
+    }
 )
 
 local default = s(
-{
-    trig = "default",
-    wordTrig = true,
-    name = "switch default statement"
-},
-fmta([[
+    {
+        trig = "default",
+        wordTrig = true,
+        name = "switch default statement",
+    },
+    fmta(
+        [[
     default:
         <body>
         break;
 ]],
-{
-    body = i(0)
-}),
-{
-    show_condition = is_in_switch
-}
+        {
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_switch,
+    }
 )
 
 local switch_expression = s(
-{
-    trig = "switche",
-    wordTrig = true,
-    name = "switch expression"
-},
-fmta(
-[[
+    {
+        trig = "switche",
+        wordTrig = true,
+        name = "switch expression",
+    },
+    fmta(
+        [[
     <variable> switch {
         _ =>> <default>
     };
 ]],
-{
-    variable = i(1),
-    default = i(0)
-}
-),
-{
-    show_condition = show_switch_expression
-}
+        {
+            variable = i(1),
+            default = i(0),
+        }
+    ),
+    {
+        show_condition = show_switch_expression,
+    }
 )
 
 local lock = s(
-{
-    trig = "lock",
-    wordTrig = true,
-    name = "lock statement"
-},
-fmta([[
+    {
+        trig = "lock",
+        wordTrig = true,
+        name = "lock statement",
+    },
+    fmta(
+        [[
     lock (<variable>)
     {
         <body>
     }
 ]],
-{
-    variable = i(1),
-    body = i(0)
-}),
-{
-    show_condition = is_in_block
-}
+        {
+            variable = i(1),
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 local using = s(
-{
-    trig = "using",
-    wordTrig = true,
-    name = "using statement"
-},
-fmta([[
+    {
+        trig = "using",
+        wordTrig = true,
+        name = "using statement",
+    },
+    fmta(
+        [[
     using (<variable>)
     {
         <body>
     }
 ]],
-{
-    variable = i(1),
-    body = i(0)
-}),
-{
-    show_condition = is_in_block
-}
+        {
+            variable = i(1),
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 local checked = s(
-{
-    trig = "checked",
-    wordTrig = true,
-    name = "checked statement"
-},
-fmta([[
+    {
+        trig = "checked",
+        wordTrig = true,
+        name = "checked statement",
+    },
+    fmta(
+        [[
     checked
     {
         <body>
     }
 ]],
-{
-    body = i(0)
-}),
-{
-    show_condition = is_in_block
-}
+        {
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 local unchecked = s(
-{
-    trig = "unchecked",
-    wordTrig = true,
-    name = "unchecked statement"
-},
-fmta([[
+    {
+        trig = "unchecked",
+        wordTrig = true,
+        name = "unchecked statement",
+    },
+    fmta(
+        [[
     unchecked
     {
         <body>
     }
 ]],
-{
-    body = i(0)
-}),
-{
-    show_condition = is_in_block
-}
+        {
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 local try = s(
-{
-    trig = "try",
-    wordTrig = true,
-    name = "try catch"
-},
-fmta([[
+    {
+        trig = "try",
+        wordTrig = true,
+        name = "try catch",
+    },
+    fmta(
+        [[
     try {
         <body>
     }
@@ -277,37 +302,42 @@ fmta([[
     {
         <catch>
     }
-]], {
-    body = i(0),
-    type = i(2, "Exception"),
-    ex = i(3, "e"),
-    catch = i(1)
-}),
-{
-    show_condition = is_in_block
-}
+]],
+        {
+            body = i(0),
+            type = i(2, "Exception"),
+            ex = i(3, "e"),
+            catch = i(1),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 local tryf = s(
-{
-    trig = "tryf",
-    wordTrig = true,
-    name = "try finally"
-},
-fmta([[
+    {
+        trig = "tryf",
+        wordTrig = true,
+        name = "try finally",
+    },
+    fmta(
+        [[
     try {
         <body>
     }
     finally {
         <finally>
     }
-]], {
-    body = i(1),
-    finally = i(0),
-}),
-{
-    show_condition = is_in_block
-}
+]],
+        {
+            body = i(1),
+            finally = i(0),
+        }
+    ),
+    {
+        show_condition = is_in_block,
+    }
 )
 
 return {
@@ -324,5 +354,5 @@ return {
     checked,
     unchecked,
     try,
-    tryf
+    tryf,
 }

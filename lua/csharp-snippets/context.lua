@@ -3,13 +3,9 @@ local ts = vim.treesitter
 
 local info_cache = {}
 local function get_or_add(csproj_path, key, value_source)
-    if info_cache[csproj_path] == nil then
-        info_cache[csproj_path] = {}
-    end
+    if info_cache[csproj_path] == nil then info_cache[csproj_path] = {} end
 
-    if info_cache[csproj_path][key] == nil then
-        info_cache[csproj_path][key] = value_source()
-    end
+    if info_cache[csproj_path][key] == nil then info_cache[csproj_path][key] = value_source() end
 
     return info_cache[csproj_path][key]
 end
@@ -103,9 +99,7 @@ local get_editorconfig = function()
         current_path = vim.fn.fnamemodify(current_path, ":h")
     end
 
-    if file == nil then
-        return nil
-    end
+    if file == nil then return nil end
 
     local handle = io.open(file, "r")
     if handle == nil then return nil end
@@ -113,15 +107,11 @@ local get_editorconfig = function()
     local is_csharp = false
 
     for line in handle:lines("a") do
-        if not is_csharp then
-            is_csharp = line:match("[*.cs]") ~= nil
-        end
+        if not is_csharp then is_csharp = line:match("[*.cs]") ~= nil end
 
         if is_csharp then
             local key, value = line:match("([^=]+)%s?=%s?([^#]+)")
-            if key ~= nil and value ~= nil then
-                rules[key] = value
-            end
+            if key ~= nil and value ~= nil then rules[key] = value end
         end
     end
     handle:close()
@@ -148,7 +138,12 @@ local function get_project_info()
 
         local language_version = project:match("<LangVersion>(.+)</LangVersion>")
         if language_version == nil then language_version = "latest" end
-        if language_version == "latest" or language_version == "latestMajor" or language_version == "default" or language_version == "preview" then
+        if
+            language_version == "latest"
+            or language_version == "latestMajor"
+            or language_version == "default"
+            or language_version == "preview"
+        then
             language_version = 9999
         else
             language_version = tonumber(language_version)
@@ -160,12 +155,13 @@ local function get_project_info()
             if version ~= nil then latest_core_version = math.max((latest_core_version or 0), tonumber(version)) end
         end
 
-    return {
-        target_frameworks = all_frameworks,
-        lang_version = language_version,
-        latest_core_version = latest_core_version,
-        default_namespace = project:match("<RootNamespace>(.+)</RootNamespace>") or vim.fn.fnamemodify(csproj, ":t:r"),
-    }
+        return {
+            target_frameworks = all_frameworks,
+            lang_version = language_version,
+            latest_core_version = latest_core_version,
+            default_namespace = project:match("<RootNamespace>(.+)</RootNamespace>")
+                or vim.fn.fnamemodify(csproj, ":t:r"),
+        }
     end)
 end
 
@@ -187,14 +183,13 @@ local function list_packages()
                 -- vim.print(package)
                 table.insert(packages, {
                     name = package.id,
-                    version = tonumber(package.resolvedVersion:match("^%d+"))
+                    version = tonumber(package.resolvedVersion:match("^%d+")),
                 })
             end
         end
 
         return packages
-    end
-    )
+    end)
 end
 
 local function get_test_library()
@@ -230,17 +225,13 @@ vim.api.nvim_create_autocmd("BufEnter", {
     callback = function()
         local csproj = get_csproj()
 
-        if csproj == nil or info_cache[csproj] ~= nil then
-            return
-        end
+        if csproj == nil or info_cache[csproj] ~= nil then return end
 
         get_project_info()
         list_packages()
 
-        if csproj:match("[Tt]ests?") then
-            get_test_library()
-        end
-    end
+        if csproj:match("[Tt]ests?") then get_test_library() end
+    end,
 })
 
 vim.api.nvim_create_autocmd("FileChangedShellPost", {
@@ -248,7 +239,7 @@ vim.api.nvim_create_autocmd("FileChangedShellPost", {
     callback = function(ev)
         local csproj = ev.file
         info_cache[csproj] = nil
-    end
+    end,
 })
 
 return {
