@@ -4,6 +4,7 @@ local d = luasnip.dynamic_node
 local t = luasnip.text_node
 local i = luasnip.insert_node
 local sn = luasnip.snippet_node
+local ts_utils = require("nvim-treesitter.ts_utils")
 
 local function get_declaration()
     local function matches(node)
@@ -68,15 +69,53 @@ local function get_parameters(node)
     return parameters
 end
 
-local function get_exceptions(node)
-    local block = node:field("body")
+local function get_exceptions(declaration)
+    local block = declaration:field("body")
     if #block == 0 or block[1]:type() ~= "block" then return {} end
 
     block = block[1]
-    local exception = {}
 
-    -- todo
-    return exception
+    local function find_variable(name)
+        for _, node in ipairs(ts_utils.get_named_children(block)) do
+            if node:type() == "variable_declaration" then
+                local variable_name = vim.treesitter.get_node_text(node:field("name")[1], 0)
+                if variable_name == name then return node end
+            end
+        end
+    end
+
+    local function iterate(node)
+        if node == nil then return {} end
+
+        if node:type() == "throw_statement" then
+            local child = node:child()
+            if child:type() == "object_creation_expression" then
+                return { vim.treesitter.get_node_text(child:field("type")[1], 0) }
+            end
+
+            -- todo fix
+            if child:type() == "identifier" then
+                local variable_name = vim.treesitter.get_node_text(child, 0)
+                local variable_declaration = find_variable(variable_name)
+                if variable_declaration ~= nil then
+                    return { vim.treesitter.get_node_text(variable_declaration:parent():field("type")[1], 0) }
+                end
+            end
+
+            return {}
+        end
+
+        local exceptions = {}
+        for child in node:iter_children() do
+            for _, ex in ipairs(iterate(child)) do
+                table.insert(exceptions, ex)
+            end
+        end
+
+        return exceptions
+    end
+
+    return iterate(block)
 end
 
 local has_return = function(node)
@@ -126,7 +165,7 @@ local xmldoc = s(
         if #exceptions > 0 then
             for idx, exception in ipairs(exceptions) do
                 table.insert(parts, t({ "", '/// <exception cref="' .. exception .. '">' }))
-                table.insert(parts, i(#parameters + 2 + (returns and 1 or 0) + idx))
+                table.insert(parts, i(#parameters + 1 + (returns and 1 or 0) + idx))
                 table.insert(parts, t({ "</exception>" }))
             end
         end
