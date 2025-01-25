@@ -75,30 +75,67 @@ local function get_exceptions(declaration)
 
     block = block[1]
 
-    local function find_variable(name)
-        for _, node in ipairs(ts_utils.get_named_children(block)) do
-            if node:type() == "variable_declaration" then
-                local variable_name = vim.treesitter.get_node_text(node:field("name")[1], 0)
-                if variable_name == name then return node end
-            end
-        end
-    end
-
     local function iterate(node)
         if node == nil then return {} end
 
         if node:type() == "throw_statement" then
-            local child = node:child()
+            local child = node:child(1)
             if child:type() == "object_creation_expression" then
                 return { vim.treesitter.get_node_text(child:field("type")[1], 0) }
             end
 
-            -- todo fix
+            -- throwing a variable
             if child:type() == "identifier" then
-                local variable_name = vim.treesitter.get_node_text(child, 0)
-                local variable_declaration = find_variable(variable_name)
-                if variable_declaration ~= nil then
-                    return { vim.treesitter.get_node_text(variable_declaration:parent():field("type")[1], 0) }
+                if #vim.lsp.get_clients() == 0 then return {} end
+
+                local start_row, start_col = child:start()
+                local params = {
+                    textDocument = vim.lsp.util.make_text_document_params(0),
+                    position = {
+                        line = start_row,
+                        character = start_col,
+                    },
+                }
+                local definition = vim.lsp.buf_request_sync(0, "textDocument/definition", params, 1000)
+                if definition == nil then return {} end
+                for _, definition_item in pairs(definition) do
+                    if definition_item.result and definition_item.result[1] then
+                        definition_item = definition_item.result[1]
+                        local range = definition_item.targetRange or definition_item.range
+
+                        local definition_node = vim.treesitter.get_node({
+                            pos = {
+                                range.start.line,
+                                range.start.character + 1,
+                            },
+                        })
+
+                        while definition_node ~= nil do
+                            local type = definition_node:field("type")
+                            if #type > 0 then return { vim.treesitter.get_node_text(type[1], 0) } end
+
+                            definition_node = definition_node:parent()
+                        end
+                    end
+                end
+                return {}
+            end
+
+            -- "throw;" - must be a catch block
+            if child:type() == ";" then
+                local parent = node:parent()
+                while parent ~= nil do
+                    local type = parent:type()
+                    if type == "catch_clause" then
+                        vim.print(parent:child(1):type())
+                        local exception_type = parent:child(1):field("type")
+                        local default = vim.fn.search("using System;", "w") > 0 and "Exception" or "System.Exception"
+                        return {
+                            #exception_type > 0 and vim.treesitter.get_node_text(exception_type[1], 0) or default,
+                        }
+                    end
+
+                    parent = parent:parent()
                 end
             end
 
@@ -106,9 +143,13 @@ local function get_exceptions(declaration)
         end
 
         local exceptions = {}
+        local seen = {}
         for child in node:iter_children() do
             for _, ex in ipairs(iterate(child)) do
-                table.insert(exceptions, ex)
+                if not seen[ex] then
+                    table.insert(exceptions, ex)
+                    seen[ex] = true
+                end
             end
         end
 
@@ -118,17 +159,22 @@ local function get_exceptions(declaration)
     return iterate(block)
 end
 
-local has_return = function(node)
+local get_return = function(node)
     local type = node:type()
+    local return_type
 
     if type == "operator_declaration" then
-        return true
-    elseif type ~= "method_declaration" then
-        return false
+        return_type = node:field("type")
+    elseif type == "method_declaration" then
+        return_type = node:field("returns")
+    else
+        return_type = {}
     end
 
-    local return_type = node:field("returns")
-    return #return_type > 0 and vim.treesitter.get_node_text(return_type[1], 0) ~= "void"
+    local return_text = #return_type > 0 and vim.treesitter.get_node_text(return_type[1], 0) or nil
+
+    if return_text == "void" or return_text == "Task" or return_text == "ValueTask" then return nil end
+    return return_text
 end
 
 local xmldoc = s(
@@ -140,7 +186,7 @@ local xmldoc = s(
     d(1, function()
         local node = get_declaration()
         local parameters = get_parameters(node)
-        local returns = has_return(node)
+        local returns = get_return(node)
         local exceptions = get_exceptions(node)
         local parts = {
             t({ "/// <summary>", "///  " }),
@@ -156,7 +202,7 @@ local xmldoc = s(
             end
         end
 
-        if returns then
+        if returns ~= nil then
             table.insert(parts, t({ "", "/// <returns>" }))
             table.insert(parts, i(#parameters + 2))
             table.insert(parts, t({ "</returns>" }))
