@@ -1,11 +1,11 @@
 local luasnip = require("luasnip")
 local s = luasnip.snippet
 local d = luasnip.dynamic_node
-local f = luasnip.function_node
 local t = luasnip.text_node
 local i = luasnip.insert_node
 local c = luasnip.choice_node
 local sn = luasnip.snippet_node
+local context = require("csharp-snippets.context")
 
 local function get_declaration()
     local function matches(node)
@@ -88,7 +88,7 @@ local function get_exceptions(declaration)
 
             -- throwing a variable
             if child:type() == "identifier" then
-                if #vim.lsp.get_clients() == 0 then return {} end
+                if not context.has_lsp() then return {} end
 
                 local start_row, start_col = child:start()
                 local params = {

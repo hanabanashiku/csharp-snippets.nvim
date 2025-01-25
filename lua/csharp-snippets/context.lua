@@ -219,6 +219,14 @@ local function get_test_library()
     end)
 end
 
+local function has_lsp()
+    for _, client in ipairs(vim.lsp.get_clients()) do
+        if client.name == "roslyn" or client.name == "omnisharp" then return true end
+    end
+
+    return false
+end
+
 -- pre-populate the cache to prevent snippet lag
 vim.api.nvim_create_autocmd("BufEnter", {
     pattern = "*.cs",
@@ -254,4 +262,5 @@ return {
     list_packages = list_packages,
     get_editorconfig = get_editorconfig,
     get_test_library = get_test_library,
+    has_lsp = has_lsp,
 }
