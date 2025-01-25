@@ -1,13 +1,14 @@
 local luasnip = require("luasnip")
 local s = luasnip.snippet
 local d = luasnip.dynamic_node
+local f = luasnip.function_node
 local t = luasnip.text_node
 local i = luasnip.insert_node
+local c = luasnip.choice_node
 local sn = luasnip.snippet_node
 
 local function get_declaration()
     local function matches(node)
-        if node == nil then return false end
         local type = node:type()
         if
             type == "class_declaration"
@@ -17,8 +18,11 @@ local function get_declaration()
             or type == "record_declaration"
             or type == "method_declaration"
             or type == "property_declaration"
+            or type == "field_declaration"
+            or type == "event_field_declaration"
             or type == "constructor_declaration"
             or type == "operator_declaration"
+            or type == "delegate_declaration"
         then
             return true
         end
@@ -173,10 +177,11 @@ local get_typeparams = function(node)
 end
 
 local get_return = function(node)
+    if node == nil then return nil end
     local type = node:type()
     local return_type
 
-    if type == "operator_declaration" then
+    if type == "operator_declaration" or type == "delegate_declaration" then
         return_type = node:field("type")
     elseif type == "method_declaration" then
         return_type = node:field("returns")
@@ -188,6 +193,28 @@ local get_return = function(node)
 
     if return_text == "void" or return_text == "Task" or return_text == "ValueTask" then return nil end
     return return_text
+end
+
+local get_baselist = function(node)
+    for child in node:iter_children() do
+        if child:type() == "base_list" then
+            local bases = {}
+            for base in child:iter_children() do
+                if string.len(base:type()) > 1 then table.insert(bases, vim.treesitter.get_node_text(base, 0)) end
+            end
+            return bases
+        end
+    end
+
+    return {}
+end
+
+local is_override = function(node)
+    for child in node:iter_children() do
+        if child:type() == "modifier" and vim.treesitter.get_node_text(child, 0) == "override" then return true end
+    end
+
+    return false
 end
 
 local xmldoc = s(
@@ -202,6 +229,9 @@ local xmldoc = s(
         local type_parameters = get_typeparams(node)
         local returns = get_return(node)
         local exceptions = get_exceptions(node)
+        local base_list = get_baselist(node)
+        local is_overriden = is_override(node)
+
         local parts = {
             t({ "/// <summary>", "///  " }),
             i(1),
@@ -238,13 +268,67 @@ local xmldoc = s(
             end
         end
 
+        if #base_list > 0 or is_overriden then
+            local cref = ""
+            if not is_overriden and (string.sub(base_list[1], 1, 1) == "I" or #base_list > 1) then
+                cref = 'cref="' .. base_list[1] .. '" '
+            end
+
+            return sn(nil, {
+                c(1, {
+                    t("/// <inheritdoc " .. cref .. "/>"),
+                    sn(nil, parts),
+                }),
+            })
+        end
+
         return sn(nil, parts)
     end, {}),
     {
-        show_condition = function() return get_declaration() ~= nil end,
+        show_condition = function()
+            local declaration = get_declaration()
+            return declaration ~= nil and declaration:type() ~= "property_declaration"
+        end,
+    }
+)
+
+local xmldoc_property = s(
+    {
+        trig = "///",
+        wordTrig = true,
+        name = "XMLDoc",
+    },
+    d(1, function()
+        local declaration = get_declaration()
+        if declaration == nil then return sn(nil, {}) end
+        local accessors = declaration:field("accessors")
+        local value = declaration:field("value")
+        local gets = #accessors > 0 and accessors[1]:child_count() > 0
+        gets = gets or (#value > 0 and value[1]:type() == "arrow_expression_clause")
+        local sets = #accessors > 0 and accessors[1]:child_count() > 1
+
+        local summary = (gets and "Gets " or "") .. (sets and "or sets " or "")
+
+        local parts = {
+            t({ "/// <summary>", "///  " .. summary }),
+            i(1),
+            t({ "", "/// </summary>" }),
+            t({ "", "/// <value>" }),
+            i(2),
+            t("</value>"),
+        }
+
+        return sn(nil, parts)
+    end, {}),
+    {
+        show_condition = function()
+            local declaration = get_declaration()
+            return declaration ~= nil and declaration:type() == "property_declaration"
+        end,
     }
 )
 
 return {
     xmldoc,
+    xmldoc_property,
 }
