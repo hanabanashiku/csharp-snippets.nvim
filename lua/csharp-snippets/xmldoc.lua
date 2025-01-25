@@ -4,7 +4,6 @@ local d = luasnip.dynamic_node
 local t = luasnip.text_node
 local i = luasnip.insert_node
 local sn = luasnip.snippet_node
-local ts_utils = require("nvim-treesitter.ts_utils")
 
 local function get_declaration()
     local function matches(node)
@@ -42,10 +41,8 @@ local function get_declaration()
 end
 
 local function get_parameters(node)
-    local parameters = nil
-
+    local parameters = {}
     local function populate(parameters_field)
-        parameters = {}
         for parameter in parameters_field:iter_children() do
             if parameter:type() == "parameter" then
                 table.insert(parameters, {
@@ -56,16 +53,17 @@ local function get_parameters(node)
         end
     end
 
-    if node == nil then return nil end
-    if #node:field("parameters") > 0 then populate(node:field("parameters")[1]) end
-
-    for child in node:iter_children() do
-        if child:type() == "parameter_list" then
-            populate(child)
-            break
+    if node == nil then return {} end
+    if #node:field("parameters") > 0 then
+        populate(node:field("parameters")[1])
+    else
+        for child in node:iter_children() do
+            if child:type() == "parameter_list" then
+                populate(child)
+                break
+            end
         end
     end
-
     return parameters
 end
 
@@ -159,6 +157,21 @@ local function get_exceptions(declaration)
     return iterate(block)
 end
 
+local get_typeparams = function(node)
+    if node == nil then return {} end
+    local list = node:field("type_parameters")
+    if #list == 0 then return {} end
+    list = list[1]
+
+    local params = {}
+    for param in list:iter_children() do
+        if param:type() == "type_parameter" then
+            table.insert(params, vim.treesitter.get_node_text(param:field("name")[1], 0))
+        end
+    end
+    return params
+end
+
 local get_return = function(node)
     local type = node:type()
     local return_type
@@ -186,6 +199,7 @@ local xmldoc = s(
     d(1, function()
         local node = get_declaration()
         local parameters = get_parameters(node)
+        local type_parameters = get_typeparams(node)
         local returns = get_return(node)
         local exceptions = get_exceptions(node)
         local parts = {
@@ -194,7 +208,7 @@ local xmldoc = s(
             t({ "", "/// </summary>" }),
         }
 
-        if parameters ~= nil then
+        if #parameters > 0 then
             for idx, param in ipairs(parameters) do
                 table.insert(parts, t({ "", '/// <param name="' .. param.name .. '">' }))
                 table.insert(parts, i(idx + 1))
@@ -202,16 +216,24 @@ local xmldoc = s(
             end
         end
 
+        if #type_parameters > 0 then
+            for idx, param in ipairs(type_parameters) do
+                table.insert(parts, t({ "", '/// <typeparam name="' .. param .. '">' }))
+                table.insert(parts, i(#parameters + idx + 1))
+                table.insert(parts, t({ "</typeparam>" }))
+            end
+        end
+
         if returns ~= nil then
             table.insert(parts, t({ "", "/// <returns>" }))
-            table.insert(parts, i(#parameters + 2))
+            table.insert(parts, i(#parameters + #type_parameters + 2))
             table.insert(parts, t({ "</returns>" }))
         end
 
         if #exceptions > 0 then
             for idx, exception in ipairs(exceptions) do
                 table.insert(parts, t({ "", '/// <exception cref="' .. exception .. '">' }))
-                table.insert(parts, i(#parameters + 1 + (returns and 1 or 0) + idx))
+                table.insert(parts, i(#parameters + #type_parameters + 1 + (returns ~= nil and 1 or 0) + idx))
                 table.insert(parts, t({ "</exception>" }))
             end
         end
