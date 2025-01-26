@@ -170,6 +170,78 @@ local function get_exceptions(declaration)
     return iterate(block)
 end
 
+local function get_http_response_types(node)
+    if node == nil or node:type() ~= NodeTypes.METHOD then return {} end
+
+    local return_type = node:field("returns")
+    if return_type == nil or #return_type == 0 then return {} end
+    return_type = vim.treesitter.get_node_text(return_type[1], 0)
+    local is_http_method = return_type:find("^I?ActionResult")
+        or return_type:find("^Task<I?ActionResult")
+        or return_type:find("^ValueTask<I?ActionResult")
+        or return_type == "IResult"
+        or return_type == "Task<IResult>"
+        or return_type == "ValueTask<IResult>"
+    if not is_http_method then return {} end
+
+    local body = node:field("body")
+    if body == nil or #body == 0 then return {} end
+
+    local codes = {}
+    local seen = {}
+
+    local method_map = {
+        ["Ok$"] = { 200 },
+        ["Created$"] = { 201 },
+        ["Accepted$"] = { 202 },
+        ["AcceptedAtRoute$"] = { 202 },
+        ["AcceptedAtAction$"] = { 202 },
+        ["File$"] = { 206, 416 },
+        ["NoContent$"] = { 204 },
+        ["BadRequest$"] = { 400 },
+        ["ValidationProblem$"] = { 400 },
+        ["Unauthorized$"] = { 401 },
+        ["Forbid$"] = { 403 },
+        ["NotFound$"] = { 404 },
+        ["Conflict$"] = { 409 },
+        ["UnprocessableEntity"] = { 422 },
+        ["InternalServerError$"] = { 500 },
+    }
+
+    local function try_add(code)
+        if seen[code] then return end
+        table.insert(codes, code)
+        seen[code] = true
+    end
+
+    local function iterate(expr)
+        if expr == nil then return end
+
+        for child in expr:iter_children() do
+            if child:type() == NodeTypes.METHOD_CALL then
+                local method = child:field("function")
+                method = (method ~= nil and #method > 0) and vim.treesitter.get_node_text(method[1], 0) or nil
+                if method == nil then return end
+
+                for pattern, pattern_codes in pairs(method_map) do
+                    if method:find(pattern) then
+                        for _, code in ipairs(pattern_codes) do
+                            try_add(code)
+                        end
+                    end
+                end
+                return
+            end
+
+            iterate(child)
+        end
+    end
+
+    iterate(body[1])
+    table.sort(codes)
+    return codes
+end
+
 local get_typeparams = function(node)
     if node == nil then return {} end
     local list = node:field("type_parameters")
@@ -239,6 +311,7 @@ local xmldoc = s(
         local parameters = get_parameters(node)
         local type_parameters = get_typeparams(node)
         local returns = nil
+        local http_responses = {}
         local exceptions = {}
         local base_list = {}
         local is_overriden = false
@@ -247,6 +320,7 @@ local xmldoc = s(
             returns = get_return(node)
             exceptions = get_exceptions(node)
             is_overriden = is_override(node)
+            http_responses = get_http_response_types(node)
         else
             base_list = get_baselist(node)
         end
@@ -279,10 +353,21 @@ local xmldoc = s(
             table.insert(parts, t({ "</returns>" }))
         end
 
+        if #http_responses > 0 then
+            for idx, code in ipairs(http_responses) do
+                table.insert(parts, t({ "", '/// <response code="' .. code .. '">' }))
+                table.insert(parts, i(#parameters + #type_parameters + (returns ~= nil and 1 or 0) + idx + 1))
+                table.insert(parts, t({ "</response>" }))
+            end
+        end
+
         if #exceptions > 0 then
             for idx, exception in ipairs(exceptions) do
                 table.insert(parts, t({ "", '/// <exception cref="' .. exception .. '">' }))
-                table.insert(parts, i(#parameters + #type_parameters + 1 + (returns ~= nil and 1 or 0) + idx))
+                table.insert(
+                    parts,
+                    i(#parameters + #type_parameters + #http_responses + 1 + (returns ~= nil and 1 or 0) + idx)
+                )
                 table.insert(parts, t({ "</exception>" }))
             end
         end

@@ -27,4 +27,5 @@ return {
     MODIFIER = "modifier",
     TYPE_PARAMETER = "type_parameter",
     BASE_CLASSES = "base_list",
+    METHOD_CALL = "invocation_expression",
 }
