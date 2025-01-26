@@ -5,24 +5,34 @@ local t = luasnip.text_node
 local i = luasnip.insert_node
 local c = luasnip.choice_node
 local sn = luasnip.snippet_node
+
 local context = require("csharp-snippets.context")
+local NodeTypes = require("csharp-snippets.NodeTypes")
+
+local function is_method(node)
+    if node == nil then return false end
+    local type = node:type()
+
+    return type == NodeTypes.METHOD or type == NodeTypes.OPERATOR or type == NodeTypes.DELEGATE
+end
 
 local function get_declaration()
     local function matches(node)
         local type = node:type()
         if
-            type == "class_declaration"
-            or type == "enum_declaration"
-            or type == "interface_declaration"
-            or type == "struct_declaration"
-            or type == "record_declaration"
-            or type == "method_declaration"
-            or type == "property_declaration"
-            or type == "field_declaration"
-            or type == "event_field_declaration"
-            or type == "constructor_declaration"
-            or type == "operator_declaration"
-            or type == "delegate_declaration"
+            type == NodeTypes.CLASS
+            or type == NodeTypes.ENUM
+            or type == NodeTypes.INTERFACE
+            or type == NodeTypes.STRUCT
+            or type == NodeTypes.RECORD
+            or type == NodeTypes.METHOD
+            or type == NodeTypes.PROPERTY
+            or type == NodeTypes.FIELD
+            or type == NodeTypes.EVENT
+            or type == NodeTypes.CONSTRUCTOR
+            or type == NodeTypes.DESTRUCTOR
+            or type == NodeTypes.OPERATOR
+            or type == NodeTypes.DELEGATE
         then
             return true
         end
@@ -73,21 +83,19 @@ end
 
 local function get_exceptions(declaration)
     local block = declaration:field("body")
-    if #block == 0 or block[1]:type() ~= "block" then return {} end
+    if #block == 0 or block[1]:type() ~= NodeTypes.BLOCK then return {} end
 
     block = block[1]
 
     local function iterate(node)
         if node == nil then return {} end
 
-        if node:type() == "throw_statement" then
+        if node:type() == NodeTypes.THROW then
             local child = node:child(1)
-            if child:type() == "object_creation_expression" then
-                return { vim.treesitter.get_node_text(child:field("type")[1], 0) }
-            end
+            if child:type() == NodeTypes.NEW then return { vim.treesitter.get_node_text(child:field("type")[1], 0) } end
 
             -- throwing a variable
-            if child:type() == "identifier" then
+            if child:type() == NodeTypes.IDENTIFIER then
                 if not context.has_lsp() then return {} end
 
                 local start_row, start_col = child:start()
@@ -128,7 +136,7 @@ local function get_exceptions(declaration)
                 local parent = node:parent()
                 while parent ~= nil do
                     local type = parent:type()
-                    if type == "catch_clause" then
+                    if type == NodeTypes.CATCH then
                         vim.print(parent:child(1):type())
                         local exception_type = parent:child(1):field("type")
                         local default = vim.fn.search("using System;", "w") > 0 and "Exception" or "System.Exception"
@@ -169,7 +177,7 @@ local get_typeparams = function(node)
 
     local params = {}
     for param in list:iter_children() do
-        if param:type() == "type_parameter" then
+        if param:type() == NodeTypes.TYPE_PARAMETER then
             table.insert(params, vim.treesitter.get_node_text(param:field("name")[1], 0))
         end
     end
@@ -181,9 +189,9 @@ local get_return = function(node)
     local type = node:type()
     local return_type
 
-    if type == "operator_declaration" or type == "delegate_declaration" then
+    if type == NodeTypes.OPERATOR or type == NodeTypes.DELEGATE then
         return_type = node:field("type")
-    elseif type == "method_declaration" then
+    elseif type == NodeTypes.METHOD then
         return_type = node:field("returns")
     else
         return_type = {}
@@ -197,7 +205,7 @@ end
 
 local get_baselist = function(node)
     for child in node:iter_children() do
-        if child:type() == "base_list" then
+        if child:type() == NodeTypes.BASE_CLASSES then
             local bases = {}
             for base in child:iter_children() do
                 if string.len(base:type()) > 1 then table.insert(bases, vim.treesitter.get_node_text(base, 0)) end
@@ -211,7 +219,9 @@ end
 
 local is_override = function(node)
     for child in node:iter_children() do
-        if child:type() == "modifier" and vim.treesitter.get_node_text(child, 0) == "override" then return true end
+        if child:type() == NodeTypes.MODIFIER and vim.treesitter.get_node_text(child, 0) == "override" then
+            return true
+        end
     end
 
     return false
@@ -227,10 +237,18 @@ local xmldoc = s(
         local node = get_declaration()
         local parameters = get_parameters(node)
         local type_parameters = get_typeparams(node)
-        local returns = get_return(node)
-        local exceptions = get_exceptions(node)
-        local base_list = get_baselist(node)
-        local is_overriden = is_override(node)
+        local returns = nil
+        local exceptions = {}
+        local base_list = {}
+        local is_overriden = false
+
+        if is_method(node) then
+            returns = get_return(node)
+            exceptions = get_exceptions(node)
+            is_overriden = is_override(node)
+        else
+            base_list = get_baselist(node)
+        end
 
         local parts = {
             t({ "/// <summary>", "///  " }),
@@ -287,7 +305,7 @@ local xmldoc = s(
     {
         show_condition = function()
             local declaration = get_declaration()
-            return declaration ~= nil and declaration:type() ~= "property_declaration"
+            return declaration ~= nil and declaration:type() ~= NodeTypes.PROPERTY
         end,
     }
 )
@@ -304,7 +322,7 @@ local xmldoc_property = s(
         local accessors = declaration:field("accessors")
         local value = declaration:field("value")
         local gets = #accessors > 0 and accessors[1]:child_count() > 0
-        gets = gets or (#value > 0 and value[1]:type() == "arrow_expression_clause")
+        gets = gets or (#value > 0 and value[1]:type() == NodeTypes.LAMBDA)
         local sets = #accessors > 0 and accessors[1]:child_count() > 1
 
         local summary = (gets and "Gets " or "") .. (sets and "or sets " or "")
@@ -323,7 +341,7 @@ local xmldoc_property = s(
     {
         show_condition = function()
             local declaration = get_declaration()
-            return declaration ~= nil and declaration:type() == "property_declaration"
+            return declaration ~= nil and declaration:type() == NodeTypes.PROPERTY
         end,
     }
 )

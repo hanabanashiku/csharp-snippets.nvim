@@ -8,6 +8,7 @@ local t = ls.text_node
 local fmta = require("luasnip.extras.fmt").fmta
 local ts_utils = require("nvim-treesitter.ts_utils")
 
+local NodeTypes = require("csharp-snippets.NodeTypes")
 local context = require("csharp-snippets.context")
 
 local function get_file_name()
@@ -34,7 +35,7 @@ end
 
 local function can_create_type()
     local node = ts_utils.get_node_at_cursor()
-    return node == nil or node:type() == "declaration_list" or node:type() == "compilation_unit"
+    return node == nil or node:type() == NodeTypes.DECLARATIONS or node:type() == NodeTypes.FILE
 end
 
 local class = s(

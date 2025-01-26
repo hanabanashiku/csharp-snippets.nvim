@@ -1,4 +1,5 @@
 local ts_utils = require("nvim-treesitter.ts_utils")
+local NodeTypes = require("csharp-snippets.NodeTypes")
 local ts = vim.treesitter
 
 local info_cache = {}
@@ -13,7 +14,7 @@ end
 local function get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
     while node do
-        if node:type() == "class_declaration" then return node end
+        if node:type() == NodeTypes.CLASS then return node end
         node = node:parent()
     end
     return nil
@@ -35,7 +36,7 @@ local function get_class_fields()
     local fields = {}
     for child in body:iter_children() do
         local variable = child:child(child:child_count() - 2)
-        if child:type() == "field_declaration" and variable ~= nil then
+        if child:type() == NodeTypes.FIELD and variable ~= nil then
             table.insert(fields, {
                 type = vim.treesitter.get_node_text(variable:field("type")[1], 0),
                 name = vim.treesitter.get_node_text(variable:child(1):field("name")[1], 0),
@@ -64,7 +65,7 @@ local function is_in_class() return get_class_name() ~= nil end
 
 local function is_in_block()
     local node = ts_utils.get_node_at_cursor()
-    return node ~= nil and node:type() == "block"
+    return node ~= nil and node:type() == NodeTypes.BLOCK
 end
 
 local function get_sln()

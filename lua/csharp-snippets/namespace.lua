@@ -8,6 +8,7 @@ local fmta = require("luasnip.extras.fmt").fmta
 
 local ts_utils = require("nvim-treesitter.ts_utils")
 local context = require("csharp-snippets.context")
+local NodeTypes = require("csharp-snippets.NodeTypes")
 
 local function file_scoped_supported()
     local editorconfig = context.get_editorconfig() or {}
@@ -26,15 +27,13 @@ local function namespace_supported()
     if node == nil then return true end
 
     -- Must be root level or within a namespace
-    if
-        node:type() ~= "compilation_unit" and (node:parent() ~= nil and node:parent():type() ~= "namespace_declaration")
-    then
+    if node:type() ~= NodeTypes.FILE and (node:parent() ~= nil and node:parent():type() ~= NodeTypes.NAMESPACE) then
         return false
     end
 
     -- Must not be within a file scoped namespace
     for child in ts_utils.get_root_for_node(node):iter_children() do
-        if child:type() == "file_scoped_namespace_declaration" then return false end
+        if child:type() == NodeTypes.FILE_SCOPED_NAMESPACE then return false end
     end
 
     return true
@@ -46,12 +45,10 @@ local function use_file_scoped()
     if node == nil then return true end
 
     for child in ts_utils.get_root_for_node(node):iter_children() do
-        if child:type() == "file_scoped_namespace_declaration" or child:type() == "namespace_declaration" then
-            return false
-        end
+        if child:type() == NodeTypes.FILE_SCOPED_NAMESPACE or child:type() == NodeTypes.NAMESPACE then return false end
     end
 
-    return node:type() == "compilation_unit"
+    return node:type() == NodeTypes.FILE
 end
 
 local function resolve_default_namespace()

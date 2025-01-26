@@ -9,6 +9,7 @@ local fmta = require("luasnip.extras.fmt").fmta
 
 local ts_utils = require("nvim-treesitter.ts_utils")
 local context = require("csharp-snippets.context")
+local NodeTypes = require("csharp-snippets.NodeTypes")
 
 local function can_create_fixture()
     local type
@@ -18,7 +19,7 @@ local function can_create_fixture()
     else
         type = nil
     end
-    return type == nil or type == "declaration_list" or type == "compilation_unit"
+    return type == nil or type == NodeTypes.DECLARATIONS or type == NodeTypes.FILE
 end
 
 local function is_nunit() return context.get_test_library() == "NUnit" end
