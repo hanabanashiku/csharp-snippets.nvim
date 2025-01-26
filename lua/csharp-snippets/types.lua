@@ -75,6 +75,49 @@ local class = s(
     }
 )
 
+local controller = s(
+    {
+        trig = "controller",
+        wordTrig = true,
+        name = "Asp.NET Core Controller",
+    },
+    fmta(
+        [[
+    <api_attribute>
+    <modifiers><static>class <identifier> : <base>
+    {
+        <body>
+    }
+    ]],
+        {
+            api_attribute = c(5, {
+                t("[ApiController]"),
+                t({}),
+            }),
+            modifiers = c(3, {
+                t("public "),
+                t("private "),
+                t("abstract "),
+                t("internal "),
+                t("protected "),
+                t(""),
+            }),
+            static = c(4, {
+                t(""),
+                t("static "),
+                t("sealed "),
+                t("unsafe "),
+            }),
+            identifier = d(1, get_default_name, {}),
+            base = i(2, "Controller"),
+            body = i(0),
+        }
+    ),
+    {
+        show_condition = can_create_type,
+    }
+)
+
 local struct = s(
     {
         trig = "struct",
@@ -244,12 +287,14 @@ local attribute = s(
 )
 
 Class_Snippet = class
+Controller_Snippet = controller
 Enum_Snippet = enum
 Interface_Snippet = interface
 Attribute_Snippet = attribute
 
 return {
     class,
+    controller,
     struct,
     interface,
     enum,

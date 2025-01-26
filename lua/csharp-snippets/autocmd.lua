@@ -18,6 +18,8 @@ vim.api.nvim_create_autocmd("BufReadPost", {
             ls.snip_expand(_G[""])
         elseif file_path:match("Attribute.cs$") then
             ls.snip_expand(_G["Attribute_Snippet"])
+        elseif file_path:match("Controller.cs$") then
+            ls.snip_expand(_G["Controller_Snippet"])
         elseif file_name:sub(0, 1) == "I" then
             ls.snip_expand(_G["Interface_Snippet"])
         elseif file_name:match("[Tt]ests?") and context.get_test_library() ~= nil then
