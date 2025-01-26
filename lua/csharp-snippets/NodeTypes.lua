@@ -1,5 +1,4 @@
 return {
-
     FILE = "compilation_unit",
     NAMESPACE = "namespace_declaration",
     FILE_SCOPED_NAMESPACE = "file_scoped_namespace_declaration",
@@ -17,6 +16,7 @@ return {
     DESTRUCTOR = "destructor_declaration",
     FIELD = "field_declaration",
     PROPERTY = "property_declaration",
+    INDEX = "indexer_declaration",
     OPERATOR = "operator_declaration",
     DELEGATE = "delegate_declaration",
     EVENT = "event_field_declaration",

@@ -28,6 +28,7 @@ local function get_declaration()
             or type == NodeTypes.METHOD
             or type == NodeTypes.PROPERTY
             or type == NodeTypes.FIELD
+            or type == NodeTypes.INDEX
             or type == NodeTypes.EVENT
             or type == NodeTypes.CONSTRUCTOR
             or type == NodeTypes.DESTRUCTOR
