@@ -1,8 +1,9 @@
+local function is_buffer_not_empty() return vim.fn.empty(vim.fn.getline(1)) ~= 1 or vim.fn.line("$") ~= 1 end
+
 vim.api.nvim_create_autocmd("BufReadPost", {
     pattern = "*.cs",
     callback = function()
-        -- check if buffer is empty
-        if vim.fn.empty(vim.fn.getline(1)) ~= 1 or vim.fn.line("$") ~= 1 then return end
+        if is_buffer_not_empty() then return end
 
         local file_path = vim.fn.expand("%:p")
         local file_name = vim.fn.expand("%:t")
@@ -27,5 +28,14 @@ vim.api.nvim_create_autocmd("BufReadPost", {
         else
             ls.snip_expand(_G["Class_Snippet"])
         end
+    end,
+})
+
+vim.api.nvim_create_autocmd("BufReadPost", {
+    pattern = { "launchSettings.json" },
+    callback = function()
+        if is_buffer_not_empty() then return end
+        local ls = require("luasnip")
+        ls.snip_expand(_G["LaunchSettings_Snippet"])
     end,
 })

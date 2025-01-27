@@ -11,6 +11,7 @@ local function get_or_add(csproj_path, key, value_source)
     return info_cache[csproj_path][key]
 end
 
+--- @return TSNode|nil
 local function get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
     while node do
@@ -20,6 +21,7 @@ local function get_enclosing_class()
     return nil
 end
 
+--- @return string|nil
 local function get_class_name()
     local class = get_enclosing_class()
     if class == nil then return nil end
@@ -28,6 +30,7 @@ local function get_class_name()
     return ts.get_node_text(name, 0)
 end
 
+---@return { name: string, type: string, node: TSNode }|nil
 local function get_class_fields()
     local class = get_enclosing_class()
     if class == nil then return nil end
@@ -48,6 +51,8 @@ local function get_class_fields()
     return fields
 end
 
+---@param name string
+---@return boolean
 local function has_type_defined(name)
     local node = ts_utils.get_node_at_cursor()
     if node == nil then return false end
@@ -61,13 +66,16 @@ local function has_type_defined(name)
     return false
 end
 
+---@return boolean
 local function is_in_class() return get_class_name() ~= nil end
 
+---@return boolean
 local function is_in_block()
     local node = ts_utils.get_node_at_cursor()
     return node ~= nil and node:type() == NodeTypes.BLOCK
 end
 
+---@return string|nil
 local function get_sln()
     local current_path = vim.fn.expand("%:p:h")
     while current_path ~= "/" do
@@ -78,6 +86,7 @@ local function get_sln()
     return nil
 end
 
+---@return string|nil
 local function get_csproj()
     local current_path = vim.fn.expand("%:p:h")
     while current_path ~= "/" do
@@ -88,6 +97,7 @@ local function get_csproj()
     return nil
 end
 
+---@return table<string, string>|nil
 local get_editorconfig = function()
     local current_path = vim.fn.expand("%:p:h")
     local file = nil
@@ -120,6 +130,7 @@ local get_editorconfig = function()
     return rules
 end
 
+---@return {target_frameworks: table<string>, lang_version: integer, latest_core_version: integer, default_namespace: string }|nil
 local function get_project_info()
     local csproj = get_csproj()
     if csproj == nil then return nil end
@@ -166,6 +177,7 @@ local function get_project_info()
     end)
 end
 
+---@return table<{name: string, version: integer}>
 local function list_packages()
     -- run dotnet cli to get packages
     local csproj_path = get_csproj()
@@ -193,6 +205,7 @@ local function list_packages()
     end)
 end
 
+---@return "NUnit"|"NUnit.Framework.Legacy"|"XUnit"|"MSTest"
 local function get_test_library()
     local csproj_path = get_csproj()
 
@@ -220,6 +233,7 @@ local function get_test_library()
     end)
 end
 
+---@return boolean
 local function has_lsp()
     for _, client in ipairs(vim.lsp.get_clients()) do
         if client.name == "roslyn" or client.name == "omnisharp" then return true end
