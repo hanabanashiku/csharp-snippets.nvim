@@ -11,17 +11,66 @@ local function get_or_add(csproj_path, key, value_source)
     return info_cache[csproj_path][key]
 end
 
---- @return TSNode|nil
+---@return TSNode?
+local function get_enclosing_node()
+    local function matches(node)
+        local type = node:type()
+        if
+            type == NodeTypes.CLASS
+            or type == NodeTypes.ENUM
+            or type == NodeTypes.INTERFACE
+            or type == NodeTypes.STRUCT
+            or type == NodeTypes.RECORD
+            or type == NodeTypes.METHOD
+            or type == NodeTypes.PROPERTY
+            or type == NodeTypes.FIELD
+            or type == NodeTypes.INDEX
+            or type == NodeTypes.EVENT
+            or type == NodeTypes.CONSTRUCTOR
+            or type == NodeTypes.DESTRUCTOR
+            or type == NodeTypes.OPERATOR
+            or type == NodeTypes.DELEGATE
+        then
+            return true
+        end
+        return false
+    end
+
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local root = vim.treesitter.get_node({ pos = { row, col } })
+    if not root then return nil end
+    local parent = root:parent()
+
+    if parent ~= nil and matches(parent) and vim.treesitter.get_range(parent)[1] == row then return root:parent() end
+
+    for node in root:iter_children() do
+        local start_row, _, end_row, _ = node:range()
+        if start_row == row and end_row >= row and matches(node) then return node end
+    end
+end
+
+---@return string?
+local function get_sln()
+    local current_path = vim.fn.expand("%:p:h")
+    while current_path ~= "/" do
+        local sln_files = vim.fn.globpath(current_path, "*.sln", false, true)
+        if #sln_files > 0 then return sln_files[1] end
+        current_path = vim.fn.fnamemodify(current_path, ":h")
+    end
+end
+
+--- @return TSNode?
 local function get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
     while node do
-        if node:type() == NodeTypes.CLASS then return node end
+        local type = node:type()
+        if node:type() == NodeTypes.CLASS or type == NodeTypes.RECORD or type == NodeTypes.STRUCT then return node end
         node = node:parent()
     end
     return nil
 end
 
---- @return string|nil
+--- @return string?
 local function get_class_name()
     local class = get_enclosing_class()
     if class == nil then return nil end
@@ -30,21 +79,50 @@ local function get_class_name()
     return ts.get_node_text(name, 0)
 end
 
----@return { name: string, type: string, node: TSNode }|nil
-local function get_class_fields()
-    local class = get_enclosing_class()
+---@param opts { modifiers: string[]? }?
+---@return { name:string, type:string, node:TSNode }[]|nil
+local function get_class_fields(opts)
+    local class = get_enclosing_node() or get_enclosing_class()
     if class == nil then return nil end
 
-    local body = class:field("body")[1]
+    local body = class:field("body")
+    if #body == 0 or body[1]:type() ~= NodeTypes.DECLARATIONS then return nil end
+    body = body[1]
+
+    local function filter(field)
+        if not opts then return true end
+        local pass = true
+
+        if opts.modifiers then
+            for _, mod in ipairs(opts.modifiers) do
+                local found = false
+                for field_child in field:iter_children() do
+                    if
+                        field_child:type() == NodeTypes.MODIFIER
+                        and vim.treesitter.get_node_text(field_child, 0) == mod
+                    then
+                        found = true
+                        break
+                    end
+                end
+                pass = pass and found
+            end
+        end
+
+        return pass
+    end
+
     local fields = {}
     for child in body:iter_children() do
         local variable = child:child(child:child_count() - 2)
         if child:type() == NodeTypes.FIELD and variable ~= nil then
-            table.insert(fields, {
-                type = vim.treesitter.get_node_text(variable:field("type")[1], 0),
-                name = vim.treesitter.get_node_text(variable:child(1):field("name")[1], 0),
-                node = child,
-            })
+            if filter(child) then
+                table.insert(fields, {
+                    type = vim.treesitter.get_node_text(variable:field("type")[1], 0),
+                    name = vim.treesitter.get_node_text(variable:child(1):field("name")[1], 0),
+                    node = child,
+                })
+            end
         end
     end
 
@@ -75,18 +153,7 @@ local function is_in_block()
     return node ~= nil and node:type() == NodeTypes.BLOCK
 end
 
----@return string|nil
-local function get_sln()
-    local current_path = vim.fn.expand("%:p:h")
-    while current_path ~= "/" do
-        local sln_files = vim.fn.globpath(current_path, "*.sln", false, true)
-        if #sln_files > 0 then return sln_files[1] end
-        current_path = vim.fn.fnamemodify(current_path, ":h")
-    end
-    return nil
-end
-
----@return string|nil
+---@return string?
 local function get_csproj()
     local current_path = vim.fn.expand("%:p:h")
     while current_path ~= "/" do
@@ -97,7 +164,7 @@ local function get_csproj()
     return nil
 end
 
----@return table<string, string>|nil
+---@return table<string, string>[]|nil
 local get_editorconfig = function()
     local current_path = vim.fn.expand("%:p:h")
     local file = nil
@@ -130,7 +197,7 @@ local get_editorconfig = function()
     return rules
 end
 
----@return {target_frameworks: table<string>, lang_version: integer, latest_core_version: integer, default_namespace: string }|nil
+---@return {target_frameworks: string[], lang_version: integer, latest_core_version: integer?, default_namespace: string }?
 local function get_project_info()
     local csproj = get_csproj()
     if csproj == nil then return nil end
@@ -177,7 +244,7 @@ local function get_project_info()
     end)
 end
 
----@return table<{name: string, version: integer}>
+---@return {name: string, version: integer}[]
 local function list_packages()
     -- run dotnet cli to get packages
     local csproj_path = get_csproj()
@@ -205,7 +272,7 @@ local function list_packages()
     end)
 end
 
----@return "NUnit"|"NUnit.Framework.Legacy"|"XUnit"|"MSTest"
+---@return "NUnit"|"NUnit.Framework.Legacy"|"XUnit"|"MSTest"|nil
 local function get_test_library()
     local csproj_path = get_csproj()
 
@@ -270,6 +337,8 @@ return {
     is_in_class = is_in_class,
     is_in_block = is_in_block,
     get_class_fields = get_class_fields,
+    get_enclosing_class = get_enclosing_class,
+    get_enclosing_node = get_enclosing_node,
     has_type_defined = has_type_defined,
     get_sln = get_sln,
     get_csproj = get_csproj,

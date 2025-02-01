@@ -16,45 +16,6 @@ local function is_method(node)
     return type == NodeTypes.METHOD or type == NodeTypes.OPERATOR or type == NodeTypes.DELEGATE
 end
 
-local function get_declaration()
-    local function matches(node)
-        local type = node:type()
-        if
-            type == NodeTypes.CLASS
-            or type == NodeTypes.ENUM
-            or type == NodeTypes.INTERFACE
-            or type == NodeTypes.STRUCT
-            or type == NodeTypes.RECORD
-            or type == NodeTypes.METHOD
-            or type == NodeTypes.PROPERTY
-            or type == NodeTypes.FIELD
-            or type == NodeTypes.INDEX
-            or type == NodeTypes.EVENT
-            or type == NodeTypes.CONSTRUCTOR
-            or type == NodeTypes.DESTRUCTOR
-            or type == NodeTypes.OPERATOR
-            or type == NodeTypes.DELEGATE
-        then
-            return true
-        end
-        return false
-    end
-
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    local root = vim.treesitter.get_node({ pos = { row, col } })
-    if not root then return nil end
-    local parent = root:parent()
-
-    if parent ~= nil and matches(parent) and vim.treesitter.get_range(parent)[1] == row then return root:parent() end
-
-    for node in root:iter_children() do
-        local start_row, _, end_row, _ = node:range()
-        if start_row == row and end_row >= row and matches(node) then return node end
-    end
-
-    return nil
-end
-
 local function get_parameters(node)
     local parameters = {}
     local function populate(parameters_field)
@@ -307,7 +268,7 @@ local xmldoc = s(
         name = "XMLDoc",
     },
     d(1, function()
-        local node = get_declaration()
+        local node = context.get_enclosing_node()
         local parameters = get_parameters(node)
         local type_parameters = get_typeparams(node)
         local returns = nil
@@ -390,7 +351,7 @@ local xmldoc = s(
     end, {}),
     {
         show_condition = function()
-            local declaration = get_declaration()
+            local declaration = context.get_enclosing_node()
             return declaration ~= nil and declaration:type() ~= NodeTypes.PROPERTY
         end,
     }
@@ -403,7 +364,7 @@ local xmldoc_property = s(
         name = "XMLDoc",
     },
     d(1, function()
-        local declaration = get_declaration()
+        local declaration = context.get_enclosing_node()
         if declaration == nil then return sn(nil, {}) end
         local accessors = declaration:field("accessors")
         local value = declaration:field("value")
@@ -426,7 +387,7 @@ local xmldoc_property = s(
     end, {}),
     {
         show_condition = function()
-            local declaration = get_declaration()
+            local declaration = context.get_enclosing_node()
             return declaration ~= nil and declaration:type() == NodeTypes.PROPERTY
         end,
     }

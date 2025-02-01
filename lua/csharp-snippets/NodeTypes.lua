@@ -26,6 +26,8 @@ return {
     IDENTIFIER = "identifier",
     MODIFIER = "modifier",
     TYPE_PARAMETER = "type_parameter",
+    TYPE_PARAMETERS = "type_parameter_list",
     BASE_CLASSES = "base_list",
+    CLASS_PARAMETERS = "parameter_list",
     METHOD_CALL = "invocation_expression",
 }
