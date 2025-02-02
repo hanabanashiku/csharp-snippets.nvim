@@ -15,6 +15,8 @@ return {
     CONSTRUCTOR = "constructor_declaration",
     DESTRUCTOR = "destructor_declaration",
     FIELD = "field_declaration",
+    VARIABLE = "variable_declaration",
+    VARIABLE_DECLARATOR = "variable_declarator",
     PROPERTY = "property_declaration",
     INDEX = "indexer_declaration",
     OPERATOR = "operator_declaration",
