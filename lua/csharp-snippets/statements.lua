@@ -2,9 +2,14 @@ local luasnip = require("luasnip")
 local s = luasnip.snippet
 local i = luasnip.insert_node
 local t = luasnip.text_node
+local d = luasnip.dynamic_node
 local f = luasnip.function_node
-local fmta = require("luasnip.extras.fmt").fmta
+local sn = luasnip.snippet_node
+local fmt = require("luasnip.extras.fmt").fmt
+local postfix = require("luasnip.extras.postfix").postfix
+local ts_postfix = require("luasnip.extras.treesitter_postfix").treesitter_postfix
 local context = require("csharp-snippets.context")
+local NodeTypes = require("csharp-snippets.NodeTypes")
 
 local is_not = f(function()
     local pattern_matching = context.get_project_info().lang_version >= 9
@@ -16,7 +21,14 @@ local is_not = f(function()
     end
 end, {})
 
-local debug_assert = s({
+local sb = luasnip.extend_decorator.apply(s, {
+    show_condition = context.is_in_block,
+})
+local sc = luasnip.extend_decorator.apply(s, {
+    show_condition = context.is_in_class,
+})
+
+local debug_assert = sb({
     trig = "asrt",
     wordTrig = true,
     name = "Make an assertion",
@@ -24,11 +36,9 @@ local debug_assert = s({
     t("Debug.Assert("),
     i(0),
     t(");"),
-}, {
-    show_condition = context.is_in_block,
 })
 
-local debug_assert_not_null = s({
+local debug_assert_not_null = sb({
     trig = "asrtn",
     wordTrig = true,
     name = "Debug.Assert",
@@ -40,11 +50,9 @@ local debug_assert_not_null = s({
     t(' null, "'),
     i(0),
     t('");'),
-}, {
-    show_condition = context.is_in_block,
 })
 
-local write_line = s({
+local write_line = sb({
     trig = "cw",
     wordTrig = true,
     name = "Console.WriteLine",
@@ -52,11 +60,9 @@ local write_line = s({
     t("Console.WriteLine("),
     i(0),
     t(");"),
-}, {
-    show_condition = context.is_in_block,
 })
 
-local write_line_out = s({
+local write_line_out = sb({
     trig = "out",
     wordTrig = true,
     name = "Print a string",
@@ -64,11 +70,9 @@ local write_line_out = s({
     t('Console.Out.WriteLine("'),
     i(0),
     t('");'),
-}, {
-    show_condition = context.is_in_block,
 })
 
-local print_variable = s({
+local print_variable = sb({
     trig = "outv",
     wordTrig = true,
     name = "Print value of a variable",
@@ -78,11 +82,9 @@ local print_variable = s({
     t(' = {0}", '),
     i(1, "var"),
     t(");"),
-}, {
-    show_condition = context.is_in_block,
 })
 
-local throw_new = s({
+local throw_new = sb({
     trig = "thr",
     wordTrig = true,
     name = "Throw new",
@@ -92,8 +94,32 @@ local throw_new = s({
     t("Exception("),
     i(2),
     t(");"),
+})
+
+local pci = sc({
+    trig = "pci",
+    wordTrig = true,
+    name = "public const int",
+}, t("public const int "))
+
+local pcs = sc({
+    trig = "pcs",
+    wordTrig = true,
+    name = "public const string",
+}, t("public const string "))
+
+local psr = sc({
+    trig = "psr",
+    wordTrig = true,
+    name = "public static readonly",
+}, t("public static readonly"))
+
+-- todo conditons
+local cast = postfix({
+    trig = ".cast",
+    name = "Cast",
 }, {
-    show_condition = context.is_in_block,
+    d(1, function(_, parent) return sn(1, fmt("({})" .. parent.snippet.env.POSTFIX_MATCH .. ";", { i(1) })) end),
 })
 
 return {
@@ -103,4 +129,8 @@ return {
     write_line_out,
     print_variable,
     throw_new,
+    pci,
+    pcs,
+    psr,
+    cast,
 }

@@ -80,13 +80,13 @@ local function get_class_name()
 end
 
 ---@param opts { modifiers: string[]? }?
----@return { name:string, type:string, node:TSNode }[]|nil
+---@return { name:string, type:string, node:TSNode }[]
 local function get_class_fields(opts)
     local class = get_enclosing_node() or get_enclosing_class()
-    if class == nil then return nil end
+    if class == nil then return {} end
 
     local body = class:field("body")
-    if #body == 0 or body[1]:type() ~= NodeTypes.DECLARATIONS then return nil end
+    if #body == 0 or body[1]:type() ~= NodeTypes.DECLARATIONS then return {} end
     body = body[1]
 
     local function filter(field)
