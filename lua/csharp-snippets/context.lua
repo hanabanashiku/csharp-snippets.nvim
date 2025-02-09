@@ -1,4 +1,5 @@
 local ts_utils = require("nvim-treesitter.ts_utils")
+local lsts = require("luasnip.extras._treesitter")
 local NodeTypes = require("csharp-snippets.NodeTypes")
 local ts = vim.treesitter
 
@@ -15,8 +16,7 @@ end
 local function get_enclosing_node()
     local function matches(node)
         local type = node:type()
-        if
-            type == NodeTypes.CLASS
+        return type == NodeTypes.CLASS
             or type == NodeTypes.ENUM
             or type == NodeTypes.INTERFACE
             or type == NodeTypes.STRUCT
@@ -30,23 +30,17 @@ local function get_enclosing_node()
             or type == NodeTypes.DESTRUCTOR
             or type == NodeTypes.OPERATOR
             or type == NodeTypes.DELEGATE
-        then
-            return true
-        end
-        return false
     end
 
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local root = vim.treesitter.get_node({ pos = { row, col } })
     if not root then return nil end
-    local parent = root:parent()
+    local node = lsts.find_first_parent(root, matches)
 
-    if parent ~= nil and matches(parent) and vim.treesitter.get_range(parent)[1] == row then return root:parent() end
+    if not node then return nil end
 
-    for node in root:iter_children() do
-        local start_row, _, end_row, _ = node:range()
-        if start_row == row and end_row >= row and matches(node) then return node end
-    end
+    local start_row, _, end_row, _ = node:range()
+    if start_row == row and end_row >= row then return node end
 end
 
 ---@return string?
@@ -62,12 +56,12 @@ end
 --- @return TSNode?
 local function get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
-    while node do
-        local type = node:type()
-        if node:type() == NodeTypes.CLASS or type == NodeTypes.RECORD or type == NodeTypes.STRUCT then return node end
-        node = node:parent()
-    end
-    return nil
+    if not node then return nil end
+
+    return lsts.find_first_parent(node, function(n)
+        local type = n:type()
+        return type == NodeTypes.CLASS or type == NodeTypes.RECORD or type == NodeTypes.STRUCT
+    end)
 end
 
 --- @return string?
@@ -80,52 +74,77 @@ local function get_class_name()
 end
 
 ---@param opts { modifiers: string[]? }?
----@return { name:string, type:string, node:TSNode }[]
+---@return { name:string, type:string, modifiers:string[], node:TSNode }[]
 local function get_class_fields(opts)
-    local class = get_enclosing_node() or get_enclosing_class()
-    if class == nil then return {} end
+    local query = vim.treesitter.query.parse(
+        "c_sharp",
+        [[
+  (
+   declaration_list
+    (field_declaration
+     (modifier)* @mod
+     (variable_declaration
+       type: (_) @type
+        (variable_declarator
+          name: (identifier) @name
+          )
+     )
+    ) @field
+   )
+    ]]
+    )
 
-    local body = class:field("body")
-    if #body == 0 or body[1]:type() ~= NodeTypes.DECLARATIONS then return {} end
-    body = body[1]
+    local class = get_enclosing_class()
+    if not class then return {} end
 
-    local function filter(field)
-        if not opts then return true end
-        local pass = true
+    local fields = {}
+    local current = nil
 
-        if opts.modifiers then
-            for _, mod in ipairs(opts.modifiers) do
+    local function verify()
+        if not current then return end
+        local o = opts or {}
+
+        if o.modifiers then
+            for _, m in ipairs(o.modifiers) do
                 local found = false
-                for field_child in field:iter_children() do
-                    if
-                        field_child:type() == NodeTypes.MODIFIER
-                        and vim.treesitter.get_node_text(field_child, 0) == mod
-                    then
+                for _, nm in ipairs(current.modifiers) do
+                    if m == nm then
                         found = true
                         break
                     end
                 end
-                pass = pass and found
+
+                if not found then
+                    current = nil
+                    return
+                end
             end
         end
 
-        return pass
+        table.insert(fields, current)
+        current = nil
     end
 
-    local fields = {}
-    for child in body:iter_children() do
-        local variable = child:child(child:child_count() - 2)
-        if child:type() == NodeTypes.FIELD and variable ~= nil then
-            if filter(child) then
-                table.insert(fields, {
-                    type = vim.treesitter.get_node_text(variable:field("type")[1], 0),
-                    name = vim.treesitter.get_node_text(variable:child(1):field("name")[1], 0),
-                    node = child,
-                })
-            end
+    for id, node in query:iter_captures(class, 0) do
+        local name = query.captures[id]
+        local text = vim.treesitter.get_node_text(node, 0)
+        if name == "field" then
+            verify()
+            current = {
+                node = node,
+                name = "",
+                type = "object",
+                modifiers = {},
+            }
+        elseif current and name == "mod" then
+            table.insert(current.modifiers, text)
+        elseif current and name == "type" then
+            current.type = text
+        elseif current and name == "name" then
+            current.name = text
         end
     end
-
+    verify()
     return fields
 end
 

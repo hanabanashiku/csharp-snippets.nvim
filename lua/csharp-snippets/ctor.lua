@@ -31,21 +31,14 @@ end
 
 local function build_constructor_body()
     local fields = context.get_class_fields()
-    local body = ""
-    local first = true
+    local body = {}
 
-    if fields == nil or #fields == 0 then return body end
+    if #fields == 0 then return body end
 
     for _, field in ipairs(fields) do
-        if not first then
-            body = body .. "\n"
-        else
-            first = false
-        end
-
         local parameter_name = format_parameter_name(field.name)
         local this = parameter_name ~= field.name and "" or "this."
-        body = this .. body .. field.name .. " = " .. parameter_name .. ";"
+        table.insert(body, ("    %s%s = %s;"):format(this, field.name, parameter_name))
     end
 
     return body
@@ -93,7 +86,7 @@ return {
             [[
     <modifiers><name>(<parameters>)
     {
-        <body>
+    <body>
     }
 
     ]],
