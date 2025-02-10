@@ -43,16 +43,6 @@ local function get_enclosing_node()
     if start_row == row and end_row >= row then return node end
 end
 
----@return string?
-local function get_sln()
-    local current_path = vim.fn.expand("%:p:h")
-    while current_path ~= "/" do
-        local sln_files = vim.fn.globpath(current_path, "*.sln", false, true)
-        if #sln_files > 0 then return sln_files[1] end
-        current_path = vim.fn.fnamemodify(current_path, ":h")
-    end
-end
-
 --- @return TSNode?
 local function get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
@@ -76,23 +66,7 @@ end
 ---@param opts { modifiers: string[]? }?
 ---@return { name:string, type:string, modifiers:string[], node:TSNode }[]
 local function get_class_fields(opts)
-    local query = vim.treesitter.query.parse(
-        "c_sharp",
-        [[
-  (
-   declaration_list
-    (field_declaration
-     (modifier)* @mod
-     (variable_declaration
-       type: (_) @type
-        (variable_declarator
-          name: (identifier) @name
-          )
-     )
-    ) @field
-   )
-    ]]
-    )
+    local q = ts.query.get("c_sharp", "cssnip_get_fields")
 
     local class = get_enclosing_class()
     if not class then return {} end
@@ -125,8 +99,8 @@ local function get_class_fields(opts)
         current = nil
     end
 
-    for id, node in query:iter_captures(class, 0) do
-        local name = query.captures[id]
+    for id, node in q:iter_captures(class, 0) do
+        local name = q.captures[id]
         local text = vim.treesitter.get_node_text(node, 0)
         if name == "field" then
             verify()
@@ -154,22 +128,36 @@ local function has_type_defined(name)
     local node = ts_utils.get_node_at_cursor()
     if node == nil then return false end
     local root = ts_utils.get_root_for_node(node)
+    local q = vim.treesitter.query.parse(
+        "c_sharp",
+        ([[
+    (_
+    name: (identifier) @name
+    (#eq? @name "%s")
+    ) @class
+    ]]):format(name)
+    )
 
-    for declaration in root:iter_children() do
-        local name_field = declaration:field("name")[1]
-        if name_field ~= nil and vim.treesitter.get_node_text(name_field, 0) == name then return true end
-    end
-
-    return false
+    return q:iter_captures(root, 0)() ~= nil
 end
 
 ---@return boolean
-local function is_in_class() return get_class_name() ~= nil end
+local function is_in_class() return get_enclosing_class() ~= nil end
 
 ---@return boolean
 local function is_in_block()
     local node = ts_utils.get_node_at_cursor()
     return node ~= nil and node:type() == NodeTypes.BLOCK
+end
+
+---@return string?
+local function get_sln()
+    local current_path = vim.fn.expand("%:p:h")
+    while current_path ~= "/" do
+        local sln_files = vim.fn.globpath(current_path, "*.sln", false, true)
+        if #sln_files > 0 then return sln_files[1] end
+        current_path = vim.fn.fnamemodify(current_path, ":h")
+    end
 end
 
 ---@return string?

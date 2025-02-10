@@ -4,45 +4,62 @@ local t = luasnip.text_node
 local i = luasnip.insert_node
 local f = luasnip.function_node
 
+local ts_utils = require("nvim-treesitter.ts_utils")
 local context = require("csharp-snippets.context")
 local helpers = require("csharp-snippets.helpers")
 local NodeTypes = require("csharp-snippets.NodeTypes")
 
 --- @return string|nil
 local function get_logger()
-    local class = context.get_enclosing_class()
-    if not class then return nil end
-    local body = helpers.field_by_name(class, "body")
-    local parameters = helpers.field_by_type(class, NodeTypes.CLASS_PARAMETERS)
+    local q = vim.treesitter.query.parse(
+        "c_sharp",
+        [[
+(
+    [
+     (field_declaration
+       (variable_declaration
+         type: (_) @type
+         (
+            variable_declarator
+                name: (identifier) @name
+          )
+         )
+       ) 
 
-    if body then
-        for child in body:iter_children() do
-            local type = helpers.field_by_name(child, "type")
-            if type and vim.treesitter.get_node_text(type, 0):match("I?Logger") then
-                local name = helpers.field_by_name(child, "name")
-                return name and vim.treesitter.get_node_text(name, 0)
-            elseif child:type() == NodeTypes.FIELD then
-                local var = helpers.field_by_type(child, NodeTypes.VARIABLE)
-                type = var and helpers.field_by_name(var, "type")
-                if var and type and vim.treesitter.get_node_text(type, 0):match("I?Logger") then
-                    local declarator = helpers.field_by_type(var, NodeTypes.VARIABLE_DECLARATOR)
-                    local name = declarator and helpers.field_by_name(declarator, "name")
-                    return name and vim.treesitter.get_node_text(name, 0)
-                end
-            end
-        end
+       (property_declaration
+         type: (_) @type
+         name: (identifier) @name
+         )
+
+       (record_declaration
+         (parameter_list
+           (parameter
+             type: (_) @type
+             name: (identifier) @name
+             )
+           )
+         )
+
+       (struct_declaration
+         (parameter_list
+           (parameter
+             type: (_) @type
+             name: (identifier) @name
+             )
+           )
+         )
+     ]
+    (#match? @type "^I?Logger")
+)
+    ]]
+    )
+    local root = ts_utils.get_node_at_cursor()
+    root = root and ts_utils.get_root_for_node(root)
+    if not root then return nil end
+
+    for id, node in q:iter_captures(root, 0) do
+        if q.captures[id] == "name" then return vim.treesitter.get_node_text(node, 0) end
     end
-
-    if class:type() == NodeTypes.RECORD and parameters ~= nil then
-        for child in parameters:iter_children() do
-            local type = helpers.field_by_name(child, "type")
-            if type and vim.treesitter.get_node_text(type, 0):match("I?Logger") then
-                return vim.treesitter.get_node_text(type, 0)
-            end
-        end
-    end
-
-    return nil
 end
 
 --- @return boolean

@@ -5,6 +5,7 @@ local i = luasnip.insert_node
 local t = luasnip.text_node
 local d = luasnip.dynamic_node
 local fmta = require("luasnip.extras.fmt").fmta
+local lsts = require("luasnip.extras._treesitter")
 
 local ts_utils = require("nvim-treesitter.ts_utils")
 local context = require("csharp-snippets.context")

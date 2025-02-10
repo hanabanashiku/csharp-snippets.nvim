@@ -1,6 +1,15 @@
 local ls = require("luasnip")
 
 local function setup()
+    if not vim.treesitter then
+        vim.notify("Treesitter not found", vim.log.levels.WARN)
+        return
+    elseif not require("nvim-treesitter.parsers").has_parser("c_sharp") then
+        vim.cmd("TSInstall c_sharp")
+    end
+
+    require("csharp-snippets.ts_queries")()
+
     ls.add_snippets("cs", require("csharp-snippets.ctor"))
     ls.add_snippets("cs", require("csharp-snippets.types"))
     ls.add_snippets("cs", require("csharp-snippets.namespace"))
@@ -13,7 +22,7 @@ local function setup()
     ls.add_snippets("cs", require("csharp-snippets.statements"))
     ls.add_snippets("json", require("csharp-snippets.configuration"))
 
-    require("csharp-snippets.autocmd")
+    require("csharp-snippets.autocmd")()
 end
 
 return {
