@@ -5,6 +5,8 @@ local i = ls.insert_node
 local d = ls.dynamic_node
 local c = ls.choice_node
 local t = ls.text_node
+local f = ls.function_node
+local k = require("luasnip.nodes.key_indexer").new_key
 local fmta = require("luasnip.extras.fmt").fmta
 local ts_utils = require("nvim-treesitter.ts_utils")
 
@@ -19,9 +21,9 @@ end
 local function get_default_name()
     local name = get_file_name()
 
-    if context.has_type_defined(name) then return sn(nil, i(1)) end
+    if context.has_type_defined(name) then return sn(nil, i(1, "", { key = "identifier" })) end
 
-    return sn(nil, i(1, name))
+    return sn(nil, i(1, name, { key = "identifier" }))
 end
 
 local function get_default_interface_name()
@@ -286,11 +288,50 @@ local attribute = s(
     }
 )
 
+local exception = s({
+    trig = "ex",
+    wordTrig = true,
+    name = "Exception",
+}, {
+    t("public class "),
+    d(1, get_default_name, {}),
+    t({
+        " : Exception",
+        "{",
+        "",
+    }),
+    t("    public "),
+    f(function(args) return args[1] end, k("identifier")),
+    t("()"),
+    t({ "", "    {", "" }),
+    t("        "),
+    i(2),
+    t({ "", "    }", "", "" }),
+    t("    public "),
+    f(function(args) return args[1] end, k("identifier")),
+    t("(string message) : base(message)"),
+    t({ "", "    {", "" }),
+    t("        "),
+    i(3),
+    t({ "", "    }", "" }),
+    t("    public "),
+    f(function(args) return args[1] end, k("identifier")),
+    t("(string message, Exception inner) : base(message, inner)"),
+    t({ "", "    {", "" }),
+    t("        "),
+    i(4),
+    t({ "", "    }", "" }),
+    t("}"),
+}, {
+    show_condition = can_create_type,
+})
+
 Class_Snippet = class
 Controller_Snippet = controller
 Enum_Snippet = enum
 Interface_Snippet = interface
 Attribute_Snippet = attribute
+Exception_Snippet = exception
 
 return {
     class,
@@ -299,4 +340,5 @@ return {
     interface,
     enum,
     attribute,
+    exception,
 }

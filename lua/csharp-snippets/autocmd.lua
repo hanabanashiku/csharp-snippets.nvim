@@ -20,6 +20,8 @@ return function()
                 ls.snip_expand(_G[""])
             elseif file_path:match("Attribute.cs$") then
                 ls.snip_expand(_G["Attribute_Snippet"])
+            elseif file_path:match("Exception.cs$") then
+                ls.snip_expand(_G["Exception_Snippet"])
             elseif file_path:match("Controller.cs$") then
                 ls.snip_expand(_G["Controller_Snippet"])
             elseif file_name:sub(0, 1) == "I" then
