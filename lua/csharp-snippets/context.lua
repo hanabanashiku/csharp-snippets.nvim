@@ -3,6 +3,7 @@ local lsts = require("luasnip.extras._treesitter")
 local NodeTypes = require("csharp-snippets.NodeTypes")
 local ts = vim.treesitter
 
+local M = {}
 local info_cache = {}
 local function get_or_add(csproj_path, key, value_source)
     if info_cache[csproj_path] == nil then info_cache[csproj_path] = {} end
@@ -13,7 +14,7 @@ local function get_or_add(csproj_path, key, value_source)
 end
 
 ---@return TSNode?
-local function get_enclosing_node()
+function M.get_enclosing_node()
     local function matches(node)
         local type = node:type()
         return type == NodeTypes.CLASS
@@ -44,7 +45,7 @@ local function get_enclosing_node()
 end
 
 --- @return TSNode?
-local function get_enclosing_class()
+function M.get_enclosing_class()
     local node = ts_utils.get_node_at_cursor()
     if not node then return nil end
 
@@ -55,8 +56,8 @@ local function get_enclosing_class()
 end
 
 --- @return string?
-local function get_class_name()
-    local class = get_enclosing_class()
+function M.get_class_name()
+    local class = M.get_enclosing_class()
     if class == nil then return nil end
 
     local name = class:field("name")[1]
@@ -65,10 +66,10 @@ end
 
 ---@param opts { modifiers: string[]? }?
 ---@return { name:string, type:string, modifiers:string[], node:TSNode }[]
-local function get_class_fields(opts)
+function M.get_class_fields(opts)
     local q = ts.query.get("c_sharp", "cssnip_get_fields")
 
-    local class = get_enclosing_class()
+    local class = M.get_enclosing_class()
     if not class then return {} end
 
     local fields = {}
@@ -124,7 +125,7 @@ end
 
 ---@param name string
 ---@return boolean
-local function has_type_defined(name)
+function M.has_type_defined(name)
     local node = ts_utils.get_node_at_cursor()
     if node == nil then return false end
     local root = ts_utils.get_root_for_node(node)
@@ -142,16 +143,16 @@ local function has_type_defined(name)
 end
 
 ---@return boolean
-local function is_in_class() return get_enclosing_class() ~= nil end
+function M.is_in_class() return M.get_enclosing_class() ~= nil end
 
 ---@return boolean
-local function is_in_block()
+function M.is_in_block()
     local node = ts_utils.get_node_at_cursor()
     return node ~= nil and node:type() == NodeTypes.BLOCK
 end
 
 ---@return string?
-local function get_sln()
+function M.get_sln()
     local current_path = vim.fn.expand("%:p:h")
     while current_path ~= "/" do
         local sln_files = vim.fn.globpath(current_path, "*.sln", false, true)
@@ -161,7 +162,7 @@ local function get_sln()
 end
 
 ---@return string?
-local function get_csproj()
+function M.get_csproj()
     local current_path = vim.fn.expand("%:p:h")
     while current_path ~= "/" do
         local csproj_files = vim.fn.globpath(current_path, "*.csproj", false, true)
@@ -172,7 +173,7 @@ local function get_csproj()
 end
 
 ---@return table<string, string>[]|nil
-local get_editorconfig = function()
+function M.get_editorconfig()
     local current_path = vim.fn.expand("%:p:h")
     local file = nil
     while current_path ~= "/" do
@@ -205,8 +206,8 @@ local get_editorconfig = function()
 end
 
 ---@return {target_frameworks: string[], lang_version: integer, latest_core_version: integer?, default_namespace: string }?
-local function get_project_info()
-    local csproj = get_csproj()
+function M.get_project_info()
+    local csproj = M.get_csproj()
     if csproj == nil then return nil end
 
     return get_or_add(csproj, "project_info", function()
@@ -252,7 +253,7 @@ local function get_project_info()
 end
 
 ---@return {name: string, version: integer}[]
-local function list_packages()
+function M.list_packages()
     -- run dotnet cli to get packages
     local csproj_path = get_csproj()
     if csproj_path == nil then return {} end
@@ -280,11 +281,11 @@ local function list_packages()
 end
 
 ---@return "NUnit"|"NUnit.Framework.Legacy"|"XUnit"|"MSTest"|nil
-local function get_test_library()
+function M.get_test_library()
     local csproj_path = get_csproj()
 
     return get_or_add(csproj_path, "test_library", function()
-        local packages = list_packages()
+        local packages = M.list_packages()
         local test_library = nil
 
         for _, package in ipairs(packages) do
@@ -308,7 +309,7 @@ local function get_test_library()
 end
 
 ---@return boolean
-local function has_lsp()
+function M.has_lsp()
     for _, client in ipairs(vim.lsp.get_clients()) do
         if client.name == "roslyn" or client.name == "omnisharp" then return true end
     end
@@ -324,10 +325,10 @@ vim.api.nvim_create_autocmd("BufEnter", {
 
         if csproj == nil or info_cache[csproj] ~= nil then return end
 
-        get_project_info()
-        list_packages()
+        M.get_project_info()
+        M.list_packages()
 
-        if csproj:match("[Tt]ests?") then get_test_library() end
+        if csproj:match("[Tt]ests?") then M.get_test_library() end
     end,
 })
 
@@ -339,19 +340,4 @@ vim.api.nvim_create_autocmd("FileChangedShellPost", {
     end,
 })
 
-return {
-    get_class_name = get_class_name,
-    is_in_class = is_in_class,
-    is_in_block = is_in_block,
-    get_class_fields = get_class_fields,
-    get_enclosing_class = get_enclosing_class,
-    get_enclosing_node = get_enclosing_node,
-    has_type_defined = has_type_defined,
-    get_sln = get_sln,
-    get_csproj = get_csproj,
-    get_project_info = get_project_info,
-    list_packages = list_packages,
-    get_editorconfig = get_editorconfig,
-    get_test_library = get_test_library,
-    has_lsp = has_lsp,
-}
+return M

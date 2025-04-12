@@ -7,9 +7,7 @@ local f = luasnip.function_node
 local sn = luasnip.snippet_node
 local fmt = require("luasnip.extras.fmt").fmt
 local postfix = require("luasnip.extras.postfix").postfix
-local ts_postfix = require("luasnip.extras.treesitter_postfix").treesitter_postfix
 local context = require("csharp-snippets.context")
-local NodeTypes = require("csharp-snippets.NodeTypes")
 
 local is_not = f(function()
     local pattern_matching = context.get_project_info().lang_version >= 9

@@ -6,8 +6,6 @@ local f = luasnip.function_node
 
 local ts_utils = require("nvim-treesitter.ts_utils")
 local context = require("csharp-snippets.context")
-local helpers = require("csharp-snippets.helpers")
-local NodeTypes = require("csharp-snippets.NodeTypes")
 
 --- @return string|nil
 local function get_logger()

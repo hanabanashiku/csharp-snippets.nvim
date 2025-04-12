@@ -1,7 +1,9 @@
+local M = {}
+
 ---@param node TSNode
 ---@param type string
 ---@return TSNode|nil
-local function field_by_type(node, type)
+function M.field_by_type(node, type)
     if node == nil or type == nil then return nil end
 
     for child in node:iter_children() do
@@ -14,7 +16,7 @@ end
 ---@param node TSNode
 ---@param name string
 ---@return TSNode|nil
-local function field_by_name(node, name)
+function M.field_by_name(node, name)
     if node == nil or type == nil then return nil end
 
     local fields = node:field(name)
@@ -22,7 +24,4 @@ local function field_by_name(node, name)
     return fields[1]
 end
 
-return {
-    field_by_type = field_by_type,
-    field_by_name = field_by_name,
-}
+return M

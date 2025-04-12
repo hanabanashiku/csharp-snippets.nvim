@@ -1,6 +1,8 @@
 local ls = require("luasnip")
 
-local function setup()
+local M = {}
+
+function M.setup()
     if not vim.treesitter then
         vim.notify("Treesitter not found", vim.log.levels.WARN)
         return
@@ -25,6 +27,4 @@ local function setup()
     require("csharp-snippets.autocmd")()
 end
 
-return {
-    setup = setup,
-}
+return M
